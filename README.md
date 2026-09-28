@@ -6,7 +6,7 @@
 
 <p align="center"><a href="https://claude.com/claude-code"><img src="assets/badges/claude-code-plugin.svg" height="20" alt="Claude Code plugin"></a> <a href="https://developers.openai.com/codex/"><img src="assets/badges/codex-plugin.svg" height="20" alt="Codex plugin"></a> <a href="LICENSE"><img src="assets/badges/license-mit.svg" height="20" alt="license: MIT"></a></p>
 
-Hire Google's Antigravity CLI (`agy`) as a staffer for **Claude Code**, **OpenAI Codex**, **Pi**, and **Hermes Agent**.
+Hire Google's Antigravity CLI (`agy`) as a staffer for **Claude Code**, **OpenAI Codex**, **Pi**, **Hermes Agent**, and **OpenCode v2**.
 
 ![agy-staff design](assets/design.png)
 
@@ -14,7 +14,7 @@ Hire Google's Antigravity CLI (`agy`) as a staffer for **Claude Code**, **OpenAI
 
 ## What & Why
 
-agy-staff lets your senior agents delegate to `agy`, which ships fast Gemini 3.8 Flash. Seven skills in total: five core execution personas (`staffer`, `researcher`, `reviewer`, `implementer`, `ask`), task orchestration guidance (`lead`), and job lifecycle management (`jobs`). Claude Code uses `/agy:<persona>`, Codex uses `$agy:<persona>`, Pi uses `/skill:agy-<persona>`, and Hermes Agent uses `/skill agy-<persona>` (or `/skill agy-staff/agy-<persona>`).
+agy-staff lets your senior agents delegate to `agy`, which ships fast Gemini 3.8 Flash. Seven skills in total: five core execution personas (`staffer`, `researcher`, `reviewer`, `implementer`, `ask`), task orchestration guidance (`lead`), and job lifecycle management (`jobs`). Claude Code uses `/agy:<persona>`, Codex uses `$agy:<persona>`, Pi uses `/skill:agy-<persona>`, Hermes Agent uses `/skill agy-<persona>` (or `/skill agy-staff/agy-<persona>`), and OpenCode v2 uses `/agy-<persona>` (or the `skill` tool).
 
 If you use Codex you know the feeling: GPT-5.6-Sol is slow even with fast mode on. Claude Code is quicker but still not fast, and Fable quota is scarce enough that you want it orchestrating subagents, not grinding through every survey and review itself. An agy worker gives you a fast lane — second opinions in seconds, research and reviews at Flash speed, scoped implementation handled off to the side while you keep moving. And where speed isn't the point, a second model family looking at the same code buys coverage and robustness your main agent can't give itself.
 
@@ -84,6 +84,21 @@ node ./scripts/install-clean-hermes.mjs
 > 
 > For full architecture details and manual setup steps, see [Hermes Clean Install Guide (zh-CN)](docs/HERMES_CLEAN_INSTALL.zh-CN.md).
 
+For **OpenCode v2** (`opencode`), a clean decoupled installer is provided (shares the `~/.agy-staff` runtime, deploys to OpenCode's global `~/.config/opencode/skills/` directory, and auto-detects existing runtimes):
+
+```bash
+node ./scripts/install-clean-opencode.mjs
+```
+
+> **Options**:
+> - Dry run (preview without writing files): `node ./scripts/install-clean-opencode.mjs --dry-run`
+> - Connectivity test with live Gemini API: `node ./scripts/install-clean-opencode.mjs --test`
+> - Force sync/update runtime: `node ./scripts/install-clean-opencode.mjs --sync-runtime`
+> - Custom runtime directory (also respects `AGY_STAFF_HOME`): `--runtime-dir <path>`
+> - Skip WSL link: `--no-wsl`
+> 
+> For full architecture details and manual setup steps, see [OpenCode Clean Install Guide (zh-CN)](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md).
+
 <details>
 <summary>Or install via Pi's Git package manager</summary>
 
@@ -98,7 +113,7 @@ Update with `pi update --extension git:github.com/keli-wen/agy-staff`, then run 
 
 </details>
 
-Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code), `$agy:ask reply with OK` (Codex), `/skill:agy-ask reply with OK` (Pi), or `/skill agy-ask reply with OK` (Hermes). Ask is tool-free and needs no setup.
+Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code), `$agy:ask reply with OK` (Codex), `/skill:agy-ask reply with OK` (Pi), `/skill agy-ask reply with OK` (Hermes), or `/agy-ask reply with OK` (OpenCode). Ask is tool-free and needs no setup.
 
 > [!IMPORTANT]
 > **There is no mandatory setup step.** `staffer`, `researcher`, `reviewer` and `implementer` run **unrestricted** by default: agy can inspect the repo, run commands, and edit files. agy-staff keeps that practical with prompts that adapt to the current repo state. For example, when `implementer` starts in a dirty workspace, the companion tells agy which files already had changes and reminds it not to overwrite or deliver unrelated user work. If the task asks for a commit, push, or PR, agy can do that delivery; otherwise it leaves a working-tree diff for review. These prompt instructions do not provide permission isolation.
@@ -128,11 +143,11 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff  # then resta
 
 Claude Code and Codex cache per version directory, so an upgrade lands only if the plugin version changed; restart the harness afterwards. If a fix does not show up, see [upgrading](docs/REFERENCE.md#upgrading) — it has the force-refresh command.
 
-For Pi and Hermes: if using clean decoupled installs, update `~/.agy-staff` (the flat skills in Pi or category skills in Hermes need no reinstall); for Pi with Git package, run `pi update --extension git:github.com/keli-wen/agy-staff` and `/reload`.
+For Pi, Hermes, and OpenCode: if using clean decoupled installs, update `~/.agy-staff` (the flat skills in Pi, category skills in Hermes, and OpenCode skills need no reinstall); for Pi with Git package, run `pi update --extension git:github.com/keli-wen/agy-staff` and `/reload`.
 
 ### CUJs
 
-Examples below use Claude Code's `/agy:…`; in Codex use `$agy:…`, in Pi use `/skill:agy-…`, and in Hermes use `/skill agy-…` (or `/skill agy-staff/agy-…`).
+Examples below use Claude Code's `/agy:…`; in Codex use `$agy:…`, in Pi use `/skill:agy-…`, in Hermes use `/skill agy-…` (or `/skill agy-staff/agy-…`), and in OpenCode use `/agy-…` (or `skill` tool).
 
 | Use case | Invocation |
 |---|---|
@@ -153,7 +168,7 @@ Examples below use Claude Code's `/agy:…`; in Codex use `$agy:…`, in Pi use 
 
 ## Core design
 
-`lead` adds task orchestration guidance for your current agent. Within lead, orient enough to frame the assignment, delegate substantive work to `staffer` by default, wait for the result, then assess it and integrate or follow up. Specialists provide dedicated guidance when useful, while `ask` is reserved for testing. The host owns cross-task decisions, acceptance, integration, and delivery, using the existing jobs workflow. Invoke `/agy:lead` in Claude Code, `$agy:lead` in Codex, `/skill:agy-lead` in Pi, or `/skill agy-lead` in Hermes.
+`lead` adds task orchestration guidance for your current agent. Within lead, orient enough to frame the assignment, delegate substantive work to `staffer` by default, wait for the result, then assess it and integrate or follow up. Specialists provide dedicated guidance when useful, while `ask` is reserved for testing. The host owns cross-task decisions, acceptance, integration, and delivery, using the existing jobs workflow. Invoke `/agy:lead` in Claude Code, `$agy:lead` in Codex, `/skill:agy-lead` in Pi, `/skill agy-lead` in Hermes, or `/agy-lead` in OpenCode.
 
 `ask` answers in the same call. The other personas return a job id and a collection command, such as `wait <id> --timeout 10m`. Your agent waits using the host's available capabilities, with one independent background wait per job where supported.
 
@@ -180,7 +195,7 @@ A few things worth knowing before you open a PR:
 - **Run the tests**: `npm test`. The standard suite uses temporary repos and HOME directories with fake `agy`, plus focused module tests. Keep regression tests offline and independent of personal settings. Real AGY validation is a separate opt-in suite described in [tests/README.md](tests/README.md).
 - **Docs come in pairs**: `README.md` / `README.zh-CN.md` and `docs/REFERENCE.md` / `docs/REFERENCE.zh-CN.md` are kept in sync. Change one, change its counterpart.
 - **Runtime code lives in `companion/`**: the entrypoint handles modes and job commands; separate modules handle streaming execution, observations and state locking. Skills call the companion, and `templates/` holds the shared prompts.
-- **Canonical skills are the source of truth**: edit personas in `skills/`, never in `pi-skills/` or `hermes-skills/`. Run `npm run generate:pi` and `npm run generate:hermes` to generate entrypoints, and `npm run check:pi` and `npm run check:hermes` to verify consistency.
+- **Canonical skills are the source of truth**: edit personas in `skills/`, never in `pi-skills/`, `hermes-skills/`, or `opencode-skills/`. Run `npm run generate:pi`, `npm run generate:hermes`, and `npm run generate:opencode` to generate entrypoints, and `npm run check:pi`, `npm run check:hermes`, and `npm run check:opencode` to verify consistency.
 
 Adding a mode or a flag changes the public surface, so please open an issue first and we can agree on the shape.
 

@@ -17,6 +17,8 @@ jobs:
         with:
           node-version: '24'
       - run: npm run check:pi
+      - run: npm run check:hermes
+      - run: npm run check:opencode
 
   test-ubuntu:
     name: Tests (Ubuntu)

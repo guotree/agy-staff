@@ -16,15 +16,19 @@
     "skills/",
     "pi-skills/",
     "hermes-skills/",
+    "opencode-skills/",
     "companion/",
     "templates/",
     "scripts/generate-pi-skills.mjs",
     "scripts/generate-hermes-skills.mjs",
+    "scripts/generate-opencode-skills.mjs",
     "scripts/install-clean-pi.mjs",
     "scripts/install-clean-hermes.mjs",
+    "scripts/install-clean-opencode.mjs",
     "docs/INSTALL_FOR_AGENTS.md",
     "docs/PI_CLEAN_INSTALL.zh-CN.md",
     "docs/HERMES_CLEAN_INSTALL.zh-CN.md",
+    "docs/OPENCODE_CLEAN_INSTALL.zh-CN.md",
     "docs/REFERENCE*.md",
     "README.zh-CN.md"
   ],
@@ -33,10 +37,13 @@
     "check:pi": "node scripts/generate-pi-skills.mjs --check",
     "generate:hermes": "node scripts/generate-hermes-skills.mjs",
     "check:hermes": "node scripts/generate-hermes-skills.mjs --check",
+    "generate:opencode": "node scripts/generate-opencode-skills.mjs",
+    "check:opencode": "node scripts/generate-opencode-skills.mjs --check",
     "test": "node --test tests/*.test.mjs",
     "test:pi": "node --test tests/pi.integration.mjs",
     "test:hermes": "node --test tests/hermes.integration.mjs",
-    "prepack": "npm run check:pi && npm run check:hermes"
+    "test:opencode": "node --test tests/opencode.integration.mjs",
+    "prepack": "npm run check:pi && npm run check:hermes && npm run check:opencode"
   },
   "pi": {
     "skills": [

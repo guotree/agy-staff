@@ -6,7 +6,7 @@
 
 <p align="center"><a href="https://claude.com/claude-code"><img src="assets/badges/claude-code-plugin.svg" height="20" alt="Claude Code plugin"></a> <a href="https://developers.openai.com/codex/"><img src="assets/badges/codex-plugin.svg" height="20" alt="Codex plugin"></a> <a href="LICENSE"><img src="assets/badges/license-mit.svg" height="20" alt="license: MIT"></a></p>
 
-把 Google 的 Antigravity CLI（`agy`）雇来当 **Claude Code**、**OpenAI Codex**、**Pi** 和 **Hermes Agent** 的「agy 员工」。
+把 Google 的 Antigravity CLI（`agy`）雇来当 **Claude Code**、**OpenAI Codex**、**Pi**、**Hermes Agent** 和 **OpenCode v2** 的「agy 员工」。
 
 ![agy-staff 设计图](assets/design.png)
 
@@ -14,7 +14,7 @@
 
 ## 它适合做什么
 
-agy-staff 共提供 7 个技能：5 个核心执行角色（通用任务 `staffer`、调研 `researcher`、审查代码方案与决策 `reviewer`、代码实现 `implementer`、免工具简短问答 `ask`）、任务编排角色 `lead`，以及负责等待、查看进度和收取结果的后台任务管理技能 `jobs`。Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`（亦支持 `/skill agy-staff/agy-<persona>`）。
+agy-staff 共提供 7 个技能：5 个核心执行角色（通用任务 `staffer`、调研 `researcher`、审查代码方案与决策 `reviewer`、代码实现 `implementer`、免工具简短问答 `ask`）、任务编排角色 `lead`，以及负责等待、查看进度和收取结果的后台任务管理技能 `jobs`。Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`（亦支持 `/skill agy-staff/agy-<persona>`），OpenCode v2 使用 `/agy-<persona>`（或 `skill` 工具）。
 
 为什么需要它：GPT-5.6-Sol 开着 fast mode 也慢；Claude Code 快一些，但 Fable 额度有限，更适合用来编排 subagent，而不是亲自做每一次调研和审查。这些任务可以交给 agy：它几秒钟就能给出第二意见，调研和审查以 Flash 的速度完成，范围明确的实现任务放到后台执行，你继续做手头的事。另外，即使不追求速度，让另一个模型家族审同一份代码，也能发现主力 agent 自己发现不了的问题。
 
@@ -74,6 +74,22 @@ node ./scripts/install-clean-hermes.mjs
 > 
 > 更多架构细节与适配说明，详见 [Hermes Agent 干净安装与解耦指南](docs/HERMES_CLEAN_INSTALL.zh-CN.md)。
 
+对于 **OpenCode v2**（`opencode`），提供规范的一键解耦安装器（共享 `~/.agy-staff` 运行时，安装至全局 `~/.config/opencode/skills/` 目录，并自动检测已有运行时）：
+
+```bash
+node ./scripts/install-clean-opencode.mjs
+```
+
+> **常用选项**：
+> - 演练模式（仅预览不修改文件）：`node ./scripts/install-clean-opencode.mjs --dry-run`
+> - 连网自检（测试 Gemini API 连通性）：`node ./scripts/install-clean-opencode.mjs --test`
+> - 强制更新运行时：`node ./scripts/install-clean-opencode.mjs --sync-runtime`
+> - 自定义运行时目录（支持环境变量 `AGY_STAFF_HOME`）：`--runtime-dir <path>`
+> - 自定义技能目录（支持环境变量 `OPENCODE_SKILLS_DIR`）：`--skills-dir <path>`
+> - 跳过 WSL 链接：`--no-wsl`
+> 
+> 更多架构细节与适配说明，详见 [OpenCode 干净安装与解耦指南](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md)。
+
 <details>
 <summary>使用 Pi 官方 Git Package 方式安装</summary>
 
@@ -88,7 +104,7 @@ pi install git:github.com/keli-wen/agy-staff
 
 </details>
 
-安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`，在 Codex 中输入 `$agy:ask reply with OK`，在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
+安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`，在 Codex 中输入 `$agy:ask reply with OK`，在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`，在 OpenCode 中输入 `/agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
 
 > [!IMPORTANT]
 > `staffer`、`researcher`、`reviewer` 和 `implementer` 默认使用 `unrestricted` 权限配置，可以读取仓库、运行命令和修改文件。插件会通过提示词说明任务边界和已有改动的归属；任务明确要求提交、推送或创建 PR 时，agy 才应执行相应操作，否则留下工作区改动供你审查。这些提示约定不能替代权限隔离。
@@ -115,7 +131,7 @@ install and verify the agy-staff plugin for the harness you are running in. Resp
 
 ![Codex 中的 $agy 技能选择器](assets/codex-desktop-screenshot.png)
 
-下面的示例使用 Claude Code 的 `/agy:…` 写法。在 Codex 中把它换成 `$agy:…` 即可；Pi 使用 `/skill:agy-…`，Hermes 使用 `/skill agy-…`（亦支持 `/skill agy-staff/agy-…`）。
+下面的示例使用 Claude Code 的 `/agy:…` 写法。在 Codex 中把它换成 `$agy:…` 即可；Pi 使用 `/skill:agy-…`，Hermes 使用 `/skill agy-…`（亦支持 `/skill agy-staff/agy-…`），OpenCode 使用 `/agy-…`（或 `skill` 工具）。
 
 | 想做的事 | 示例 |
 | --- | --- |
@@ -136,7 +152,7 @@ install and verify the agy-staff plugin for the harness you are running in. Resp
 
 ## 核心设计
 
-`lead` 为当前主 agent 增加任务编排指导。在 lead 工作流中，主 agent 了解至足以明确任务后，默认用 `staffer` 承担实质性工作，等待结果返回后再验收、整合或追加任务；专门指导有帮助时再选择 specialist，`ask` 仅用于测试。主 agent 负责跨任务决策、验收、整合和交付，复用现有 jobs 工作流。Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`，Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`。
+`lead` 为当前主 agent 增加任务编排指导。在 lead 工作流中，主 agent 了解至足以明确任务后，默认用 `staffer` 承担实质性工作，等待结果返回后再验收、整合或追加任务；专门指导有帮助时再选择 specialist，`ask` 仅用于测试。主 agent 负责跨任务决策、验收、整合和交付，复用现有 jobs 工作流。Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`，Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`，OpenCode 使用 `/agy-lead`。
 
 `ask` 会在同一次调用中返回答案。其他角色启动后会先返回任务 ID，并给出收取结果的命令，例如 `wait <id> --timeout 10m`。主 agent 根据所在环境的能力等待任务；如果支持后台命令，就为每个任务保留一个独立的等待命令。
 
@@ -168,7 +184,7 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff
 
 这两个环境都按版本号管理插件缓存。如果更新后仍然看到旧行为，请先确认是否已重启应用，再参考[升级说明](docs/REFERENCE.zh-CN.md#升级)检查版本和实际安装的提交。
 
-对于 Pi 和 Hermes：如果采用一键解耦安装，日常升级只需同步更新 `~/.agy-staff` 运行时即可，无需重新安装技能；对于 Pi 的 Git Package 安装，运行 `pi update --extension git:github.com/keli-wen/agy-staff` 并在 Pi 中执行 `/reload`。
+对于 Pi、Hermes 和 OpenCode：如果采用一键解耦安装，日常升级只需同步更新 `~/.agy-staff` 运行时即可，无需重新安装技能；对于 Pi 的 Git Package 安装，运行 `pi update --extension git:github.com/keli-wen/agy-staff` 并在 Pi 中执行 `/reload`。
 
 ## 社区
 
@@ -180,7 +196,7 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff
 
 提交代码前请运行 `npm test`。标准测试使用临时仓库、临时 HOME 和假的 agy，不会调用真实模型或改动你的个人配置。新增回归测试也应保持这一点。需要验证真实 AGY 时，请使用[测试说明](tests/README.md)中单独启用的集成测试。
 
-运行逻辑位于 `companion/`：入口负责模式和任务命令，独立模块负责流式执行、进度快照和状态锁。角色技能位于 `skills/`，共享的提示词模板位于 `templates/`。修改技能时请以 `skills/` 为准，再运行 `npm run generate:pi` 和 `npm run generate:hermes` 分别生成 `pi-skills/` 与 `hermes-skills/`，用 `npm run check:pi` 和 `npm run check:hermes` 检查是否一致。
+运行逻辑位于 `companion/`：入口负责模式和任务命令，独立模块负责流式执行、进度快照和状态锁。角色技能位于 `skills/`，共享的提示词模板位于 `templates/`。修改技能时请以 `skills/` 为准，再运行 `npm run generate:pi`、`npm run generate:hermes` 和 `npm run generate:opencode` 分别生成 `pi-skills/`、`hermes-skills/` 与 `opencode-skills/`，用 `npm run check:pi`、`npm run check:hermes` 和 `npm run check:opencode` 检查是否一致。
 
 README 和参考手册都有中英文版本。修改使用方法或行为说明时，请同步更新对应版本，让两种语言的读者得到一致的信息。
 

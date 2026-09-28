@@ -16,11 +16,11 @@ You normally know which product you are. If unsure, check:
 
 - **Claude Code** — you have `/plugin` slash commands, project instructions arrive via `CLAUDE.md`, and your Bash tool typically has `CLAUDECODE=1` in the environment. → Follow section 2a.
 - **Codex** — you invoke skills with `$name` syntax, follow `AGENTS.md`, and plugins are managed through the `codex` CLI. → Follow section 2b.
-- **Pi** — you invoke skills with `/skill:name` and manage packages with `pi install`. → Follow section 2c.
 - **Hermes Agent** — you manage skills under `~/.hermes/skills/` (or `%LOCALAPPDATA%\hermes\skills`), follow the `agentskills.io` standard, and invoke via `/skill agy-<name>`. → Follow section 2d.
-- **Anything else** — this package documents Claude Code, Codex, Pi, and Hermes Agent. Report the unsupported harness and stop.
+- **OpenCode** — you invoke skills with `/agy-*` or `skill` tool, follow `~/.config/opencode/skills/` (or `%USERPROFILE%\.config\opencode\skills`), and check skills via `opencode api get /api/skill`. → Follow section 2e.
+- **Anything else** — this package documents Claude Code, Codex, Pi, Hermes Agent, and OpenCode v2. Report the unsupported harness and stop.
 
-Follow exactly one of the four sections below.
+Follow exactly one of the five sections below.
 
 ## 2a. Claude Code — install / upgrade
 
@@ -158,6 +158,48 @@ To use in Hermes chat or session:
 > - Run commands as standard foreground tasks (`background: false`, `pty: false`).
 > - When providing the `timeout` parameter to Hermes's `terminal` tool, specify it in **seconds** (e.g. `timeout: 120` for 2 minutes). **Never use milliseconds** (such as `120000`): values exceeding Hermes's 600s foreground limit trigger automatic demotion to background with `DEVNULL` pipe output.
 
+## 2e. OpenCode — install / upgrade
+
+OpenCode v2 (`opencode`) follows the OpenCode skill directory standard. agy-staff installs its shared runtime into `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) and deploys clean skills into OpenCode's global skill directory:
+- Linux / macOS: `~/.config/opencode/skills/<skill-id>/SKILL.md` (or `$XDG_CONFIG_HOME/opencode/skills/`)
+- Windows: `%USERPROFILE%\.config\opencode\skills\<skill-id>\SKILL.md`
+
+### Automated Install
+
+From the `agy-staff` repository checkout:
+
+```bash
+node scripts/install-clean-opencode.mjs
+```
+
+The script automatically:
+1. **Checks Shared Runtime**: Verifies if `~/.agy-staff` runtime (`companion/agy-companion.mjs` syntax and `templates/` integrity) already exists from another agent (such as Pi or Hermes). If healthy, it skips runtime copying to avoid unnecessary writes. Use `--sync-runtime` to force update.
+2. **Deploys OpenCode Skills**: Installs the 7 standard skills (`agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`) under `<opencode-skills-dir>/`.
+3. **Cross-Platform Pathing & Dynamic Adaptation**: Ensures cross-platform compatibility via `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/...` and direct `$env:USERPROFILE` fallback for Windows PowerShell.
+
+Options for the installer:
+- `--sync-runtime`: Force overwrite/update of shared runtime.
+- `--dry-run`: Preview planned actions without modifying disk.
+- `--test`: Run connectivity smoke test against Gemini after installation.
+- `--runtime-dir <dir>`: Target location for shared runtime.
+- `--skills-dir <dir>`: Target directory for skills.
+- `--no-wsl`: Skip WSL symlink detection and linking on Windows.
+
+### Verify OpenCode Registration
+
+Run the OpenCode CLI / API to verify:
+
+```bash
+opencode api get /api/skill
+```
+
+All 7 skills should appear in the JSON payload with `autoinvoke: true`.
+
+> [!IMPORTANT]
+> **OpenCode `shell` tool guidance**:
+> - Run commands as standard foreground tasks (`background: false`), except for long jobs waiting (`agy-jobs wait <id>`), where `background: true` (or long timeout) is recommended.
+> - When providing the `timeout` parameter to OpenCode's `shell` tool, specify it in **milliseconds** (e.g. `timeout: 120000` for 2 minutes). Do NOT pass seconds.
+
 ## 3. Smoke test
 
 Run the zero-setup ask mode — it needs no allowlist and answers in ~3 seconds:
@@ -166,6 +208,7 @@ Run the zero-setup ask mode — it needs no allowlist and answers in ~3 seconds:
 - Codex: `$agy:ask reply with OK`
 - Pi: `/skill:agy-ask reply with OK` — after restart or `/reload`
 - Hermes: `/skill agy-ask reply with OK` (or `/skill agy-staff/agy-ask reply with OK`)
+- OpenCode: `/agy-ask reply with OK` (or via `skill` tool)
 
 If you cannot restart the session, call the companion of the freshly installed copy directly from the shell. It is the same code path the skill takes, so a pass here means the install is sound:
 
@@ -174,7 +217,7 @@ If you cannot restart the session, call the companion of the freshly installed c
 AGY_ROOT=$(node -p 'require(((process.env.HOME || process.env.USERPROFILE))+"/.claude/plugins/installed_plugins.json").plugins["agy@agy-staff"][0].installPath')
 node "$AGY_ROOT/companion/agy-companion.mjs" ask --prompt "reply with OK"
 
-# Decoupled Pi / Hermes clean install (Bash / sh):
+# Decoupled Pi / Hermes / OpenCode clean install (Bash / sh):
 node "${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs" ask --prompt "reply with OK"
 # In PowerShell: node "$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs" ask --prompt "reply with OK"
 ```
