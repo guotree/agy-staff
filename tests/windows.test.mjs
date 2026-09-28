@@ -61,7 +61,8 @@ test('repoRoot() memoization: wait invokes git rev-parse at most a constant numb
   const id = jobIdOf(dispatch.stdout);
 
   // Fake git wrapper: increments counter on rev-parse --show-toplevel and returns sb.repo
-  const realGit = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim() || 'git';
+  const whichCmd = process.platform === 'win32' ? 'where.exe' : 'which';
+  const realGit = spawnSync(whichCmd, ['git'], { encoding: 'utf8' }).stdout?.split(/\r?\n/)[0]?.trim() || 'git';
   const fakeGit = path.join(bin, 'git');
   fs.writeFileSync(
     fakeGit,

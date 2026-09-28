@@ -17,9 +17,10 @@ You normally know which product you are. If unsure, check:
 - **Claude Code** — you have `/plugin` slash commands, project instructions arrive via `CLAUDE.md`, and your Bash tool typically has `CLAUDECODE=1` in the environment. → Follow section 2a.
 - **Codex** — you invoke skills with `$name` syntax, follow `AGENTS.md`, and plugins are managed through the `codex` CLI. → Follow section 2b.
 - **Pi** — you invoke skills with `/skill:name` and manage packages with `pi install`. → Follow section 2c.
-- **Anything else** — this package documents Claude Code, Codex, and Pi. Report the unsupported harness and stop.
+- **Hermes Agent** — you manage skills under `~/.hermes/skills/` (or `%LOCALAPPDATA%\hermes\skills`), follow the `agentskills.io` standard, and invoke via `/skill agy-<name>`. → Follow section 2d.
+- **Anything else** — this package documents Claude Code, Codex, Pi, and Hermes Agent. Report the unsupported harness and stop.
 
-Follow exactly one of the three sections below.
+Follow exactly one of the four sections below.
 
 ## 2a. Claude Code — install / upgrade
 
@@ -62,13 +63,39 @@ Then the user must restart the app — Codex caches plugins per version. Upgrade
 
 ## 2c. Pi — install / upgrade / local development
 
-Install (use the local checkout path if provided):
+Pi Agent (`@earendil-works/pi-coding-agent`) supports both automated clean decoupled installation and the official Git package format.
+
+### Recommended: Automated Clean Decoupled Install
+
+Installs the shared runtime into `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) and deploys clean flat skills into Pi's skill directory (`~/.pi/agent/skills/`), avoiding 9-level directory nesting, Git package collisions, and Git Bash path mangling on Windows:
+
+```bash
+node scripts/install-clean-pi.mjs
+```
+
+The script automatically:
+1. **Checks Shared Runtime**: Verifies if `~/.agy-staff` runtime (`companion/agy-companion.mjs` syntax and `templates/` integrity) already exists and is healthy. If healthy, it skips runtime copying to avoid unnecessary writes. Use `--sync-runtime` to force update.
+2. **Deploys Flat Skills**: Installs the 7 standard skills (`agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`) under `~/.pi/agent/skills/`.
+3. **Cross-Platform Pathing & Dynamic Adaptation**: Rewrites invocation commands to use `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/...` and detects Windows Git Bash settings.
+
+Options for the installer:
+- `--sync-runtime`: Force overwrite/update of shared runtime (alias: `--force-runtime`).
+- `--dry-run`: Preview planned actions without modifying disk.
+- `--test`: Run connectivity smoke test against Gemini after installation.
+- `--runtime-dir <dir>`: Target location for shared runtime (also respects `$AGY_STAFF_HOME`).
+- `--skills-dir <dir>`: Target directory for skills (also respects `$PI_CODING_AGENT_DIR/skills`).
+- `--settings-file <file>`: Target Pi configuration file.
+- `--no-wsl`: Skip WSL symlink detection and linking on Windows.
+
+To upgrade a clean decoupled install, updating `~/.agy-staff` is sufficient without reinstalling skills.
+
+### Alternative: Official Git Package Install
+
+From within Pi or your shell:
 
 ```bash
 pi install git:github.com/keli-wen/agy-staff
 ```
-
-For local development checkouts, use `pi install /absolute/path/to/checkout` (or `pi -e /absolute/path/to/checkout` for a temporary session). Run `npm run generate:pi` in the checkout if canonical skills were modified.
 
 To upgrade an existing Git install:
 
@@ -76,7 +103,60 @@ To upgrade an existing Git install:
 pi update --extension git:github.com/keli-wen/agy-staff
 ```
 
-Restart Pi or run `/reload` afterwards. Use `pi list` to verify the package is registered, then check Pi's skill picker for `agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`.
+For local development checkouts, use `pi install /absolute/path/to/checkout` (or `pi -e /absolute/path/to/checkout` for a temporary session). Run `npm run generate:pi` in the checkout if canonical skills were modified.
+
+Restart Pi or run `/reload` afterwards. Use `pi list` to verify registered packages, then check Pi's skill picker for `agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`.
+
+## 2d. Hermes Agent — install / upgrade
+
+Hermes Agent (Nous Research) follows the `agentskills.io` skill directory format. agy-staff installs its shared runtime into `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) and deploys clean category skills into Hermes's skill directory:
+- Linux / macOS: `~/.hermes/skills/agy-staff/`
+- Windows: `%LOCALAPPDATA%\hermes\skills\agy-staff\` (or `~/.hermes/skills/agy-staff/` if `$HERMES_HOME` is customized)
+
+### Automated Install
+
+From the `agy-staff` repository checkout:
+
+```bash
+node scripts/install-clean-hermes.mjs
+```
+
+The script automatically:
+1. **Checks Shared Runtime**: Verifies if `~/.agy-staff` runtime (`companion/agy-companion.mjs` syntax and `templates/` integrity) already exists from another agent (such as Pi Agent). If healthy, it skips runtime copying to avoid unnecessary writes. Use `--sync-runtime` to force update.
+2. **Deploys Categorized Skills**: Installs the 7 standard skills (`agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`) under `<hermes-home>/skills/agy-staff/`.
+3. **Cross-Platform Pathing & Dynamic Adaptation**: Ensures cross-platform compatibility via `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/...` and automatically rewrites deployed skills to point directly to `--runtime-dir` if a custom location is supplied.
+
+Options for the installer:
+- `--sync-runtime`: Force overwrite/update of shared runtime.
+- `--dry-run`: Preview planned actions without modifying disk.
+- `--test`: Run connectivity smoke test against Gemini after installation.
+- `--runtime-dir <dir>`: Target location for shared runtime (also respects `$AGY_STAFF_HOME`).
+- `--hermes-home <dir>`: Hermes base directory (also respects `$HERMES_HOME`).
+- `--skills-dir <dir>`: Target directory for skills (also respects `$HERMES_SKILLS_DIR`).
+- `--category <name>`: Skill category namespace (default `agy-staff`, also respects `$HERMES_SKILLS_CATEGORY`).
+- `--no-wsl`: Skip WSL symlink detection and linking on Windows.
+
+### Verify Hermes Registration
+
+Run the Hermes CLI to list installed skills:
+
+```bash
+hermes skills list
+```
+
+All 7 skills should appear under category `agy-staff` with status `enabled`.
+
+To use in Hermes chat or session:
+```text
+/skill agy-ask reply with OK
+# or
+/skill agy-staff/agy-ask reply with OK
+```
+
+> [!IMPORTANT]
+> **Hermes `terminal` tool guidance**:
+> - Run commands as standard foreground tasks (`background: false`, `pty: false`).
+> - When providing the `timeout` parameter to Hermes's `terminal` tool, specify it in **seconds** (e.g. `timeout: 120` for 2 minutes). **Never use milliseconds** (such as `120000`): values exceeding Hermes's 600s foreground limit trigger automatic demotion to background with `DEVNULL` pipe output.
 
 ## 3. Smoke test
 
@@ -85,12 +165,18 @@ Run the zero-setup ask mode — it needs no allowlist and answers in ~3 seconds:
 - Claude Code: `/agy:ask "reply with OK"` — **after the restart**, otherwise you are testing the old copy or nothing at all
 - Codex: `$agy:ask reply with OK`
 - Pi: `/skill:agy-ask reply with OK` — after restart or `/reload`
+- Hermes: `/skill agy-ask reply with OK` (or `/skill agy-staff/agy-ask reply with OK`)
 
 If you cannot restart the session, call the companion of the freshly installed copy directly from the shell. It is the same code path the skill takes, so a pass here means the install is sound:
 
 ```bash
-AGY_ROOT=$(node -p 'require(process.env.HOME+"/.claude/plugins/installed_plugins.json").plugins["agy@agy-staff"][0].installPath')
+# Claude Code:
+AGY_ROOT=$(node -p 'require(((process.env.HOME || process.env.USERPROFILE))+"/.claude/plugins/installed_plugins.json").plugins["agy@agy-staff"][0].installPath')
 node "$AGY_ROOT/companion/agy-companion.mjs" ask --prompt "reply with OK"
+
+# Decoupled Pi / Hermes clean install (Bash / sh):
+node "${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs" ask --prompt "reply with OK"
+# In PowerShell: node "$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs" ask --prompt "reply with OK"
 ```
 
 Resolve the root that way rather than globbing `cache/agy-staff/agy/*/`: superseded version directories are left behind after an upgrade, so the glob expands to several paths and the command fails with `unknown subcommand`. `installPath` is always the copy in use. (Codex's equivalent root is printed by `codex plugin list`.) A fallback pass still leaves the restart outstanding — report it as "installed and verified, restart Claude Code to use it".

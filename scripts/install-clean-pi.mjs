@@ -18,13 +18,21 @@ const DEFAULT_SOURCE_REPO = path.resolve(__dirname, '..');
 
 // 命令行参数解析
 const args = process.argv.slice(2);
+const piBaseDir = process.env.PI_CODING_AGENT_DIR
+  ? path.resolve(process.env.PI_CODING_AGENT_DIR.trim())
+  : (process.env.PI_HOME ? path.resolve(process.env.PI_HOME.trim()) : path.join(os.homedir(), '.pi', 'agent'));
+
 const options = {
   dryRun: args.includes('--dry-run'),
   runTest: args.includes('--test'),
-  sourceRepo: getArgValue('--source-repo') || DEFAULT_SOURCE_REPO,
-  runtimeDir: getArgValue('--runtime-dir') || path.join(os.homedir(), '.agy-staff'),
-  skillsDir: getArgValue('--skills-dir') || path.join(os.homedir(), '.pi', 'agent', 'skills'),
-  settingsFile: getArgValue('--settings-file') || path.join(os.homedir(), '.pi', 'agent', 'settings.json'),
+  forceRuntime: args.includes('--force-runtime') || args.includes('--sync-runtime'),
+  noWsl: args.includes('--no-wsl'),
+  sourceRepo: getArgValue('--source-repo') ? path.resolve(getArgValue('--source-repo')) : DEFAULT_SOURCE_REPO,
+  runtimeDir: getArgValue('--runtime-dir')
+    ? path.resolve(getArgValue('--runtime-dir'))
+    : (process.env.AGY_STAFF_HOME ? path.resolve(process.env.AGY_STAFF_HOME.trim()) : path.join(os.homedir(), '.agy-staff')),
+  skillsDir: getArgValue('--skills-dir') ? path.resolve(getArgValue('--skills-dir')) : path.join(piBaseDir, 'skills'),
+  settingsFile: getArgValue('--settings-file') ? path.resolve(getArgValue('--settings-file')) : path.join(piBaseDir, 'settings.json'),
   help: args.includes('--help') || args.includes('-h'),
 };
 
@@ -38,12 +46,14 @@ if (options.help) {
 用法: node scripts/install-clean-pi.mjs [选项]
 
 选项:
-  --dryRun, --dry-run      演练模式，仅打印将要执行的操作，不修改任何文件
+  --dry-run               演练模式，仅打印将要执行的操作，不修改任何文件
   --test                  安装完成后执行真实的连网大模型连通性测试 (默认仅做离线完整性自检)
+  --force-runtime         即使运行时已就绪也强制覆盖更新运行时 (别名: --sync-runtime)
   --source-repo <dir>     agy-staff 源码仓库根目录 (默认: 脚本上级目录)
-  --runtime-dir <dir>     全局共享运行时目标目录 (默认: ~/.agy-staff)
-  --skills-dir <dir>      Pi 技能目标目录 (默认: ~/.pi/agent/skills)
-  --settings-file <file>  Pi 配置文件路径 (默认: ~/.pi/agent/settings.json)
+  --runtime-dir <dir>     全局共享运行时目标目录 (默认: $AGY_STAFF_HOME 或 ~/.agy-staff)
+  --skills-dir <dir>      Pi 技能目标目录 (默认: $PI_CODING_AGENT_DIR/skills 或 ~/.pi/agent/skills)
+  --settings-file <file>  Pi 配置文件路径 (默认: $PI_CODING_AGENT_DIR/settings.json 或 ~/.pi/agent/settings.json)
+  --no-wsl                在 Windows 上跳过 WSL 互通软链接检测与配置
   -h, --help              显示此帮助信息
 `);
   process.exit(0);
@@ -131,16 +141,52 @@ if (fs.existsSync(legacyGitCache)) {
   }
 }
 
-// 2. 部署全局共享运行时
-log.info(`[2/5] 部署共享运行时至: ${options.runtimeDir}`);
-if (!options.dryRun) {
-  copyDirRecursive(sourceCompanion, path.join(options.runtimeDir, 'companion'));
-  copyDirRecursive(sourceTemplates, path.join(options.runtimeDir, 'templates'));
+// 检查运行时健康度
+function checkRuntimeHealth(runtimeDir) {
+  const companionFile = path.join(runtimeDir, 'companion', 'agy-companion.mjs');
+  const templatesDir = path.join(runtimeDir, 'templates');
+  if (!fs.existsSync(companionFile) || !fs.existsSync(templatesDir)) {
+    return { ok: false, reason: '未找到 companion 或 templates 目录' };
+  }
+  try {
+    const tFiles = fs.readdirSync(templatesDir);
+    if (tFiles.length === 0) {
+      return { ok: false, reason: 'templates 目录为空' };
+    }
+    const nodeCheck = spawnSync(process.execPath, ['--check', companionFile], { encoding: 'utf8' });
+    if (nodeCheck.status !== 0) {
+      return { ok: false, reason: `语法解析检查未通过: ${nodeCheck.stderr || 'unknown'}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
 }
-log.dim(`已同步 companion/ 与 templates/ 到运行时中心`);
+
+// 2. 检查并按需安装全局共享运行时
+log.info(`[2/5] 检查共享运行时环境: ${options.runtimeDir}`);
+const runtimeHealth = checkRuntimeHealth(options.runtimeDir);
+
+if (runtimeHealth.ok && !options.forceRuntime) {
+  log.success(`全局共享运行时已就绪且完整 (跳过安装)`);
+  log.dim(`检测到已有 Agent 或先前安装的运行时: ${options.runtimeDir}`);
+  log.dim(`(如需强制覆盖更新运行时，可附加 --sync-runtime 参数)`);
+} else {
+  if (options.forceRuntime && runtimeHealth.ok) {
+    log.info(`收到强制更新指示，正在同步最新运行时到: ${options.runtimeDir}...`);
+  } else {
+    log.info(`共享运行时未就绪 (${runtimeHealth.reason})，正在安装至: ${options.runtimeDir}...`);
+  }
+
+  if (!options.dryRun) {
+    copyDirRecursive(sourceCompanion, path.join(options.runtimeDir, 'companion'));
+    copyDirRecursive(sourceTemplates, path.join(options.runtimeDir, 'templates'));
+  }
+  log.success(`已完成共享运行时 companion/ 与 templates/ 的部署`);
+}
 
 // 3. WSL 互通支持（仅 Windows 下动态探测）
-if (process.platform === 'win32') {
+if (process.platform === 'win32' && !options.noWsl) {
   log.info('[3/5] 检测 WSL 环境互通性...');
   try {
     // 动态探测是否有真实的 WSL 发行版
@@ -156,7 +202,7 @@ if (process.platform === 'win32') {
         const wslTarget = wslPathProc.stdout.trim();
         log.dim(`解析到 WSL 挂载路径: ${wslTarget}`);
         if (!options.dryRun) {
-          spawnSync('wsl.exe', ['-e', 'bash', '-c', `ln -sfn "${wslTarget}" ~/.agy-staff`], {
+          spawnSync('wsl.exe', ['-e', 'bash', '-c', `[ -L ~/.agy-staff ] || [ ! -e ~/.agy-staff ] && ln -sfn "${wslTarget}" ~/.agy-staff`], {
             timeout: 5000,
           });
         }
@@ -168,6 +214,8 @@ if (process.platform === 'win32') {
   } catch (e) {
     log.dim(`WSL 探测跳过 (非关键项): ${e.message}`);
   }
+} else if (options.noWsl) {
+  log.dim('已指定 --no-wsl，跳过 WSL 软链接检测');
 } else {
   log.dim('当前为非 Windows 平台，无需配置 WSL 软链接');
 }
@@ -181,39 +229,59 @@ if (!options.dryRun) {
   copyDirRecursive(sourcePiSkills, options.skillsDir);
 }
 
-// 转换所有 SKILL.md 中的寻址路径
+// 转换所有 SKILL.md 及 references 中的寻址路径
 let convertedCount = 0;
 if (fs.existsSync(options.skillsDir) || options.dryRun) {
+  const defaultRuntimeDir = path.join(os.homedir(), '.agy-staff');
+  const isCustomRuntime = path.resolve(options.runtimeDir) !== path.resolve(defaultRuntimeDir);
+  const runtimePosix = isCustomRuntime
+    ? options.runtimeDir.split(path.sep).join('/')
+    : '${USERPROFILE:-$HOME}/.agy-staff';
+
   const skillDirs = fs.readdirSync(sourcePiSkills, { withFileTypes: true });
   for (const dir of skillDirs) {
     if (!dir.isDirectory() || !dir.name.startsWith('agy-')) continue;
-    const skillMdPath = path.join(options.skillsDir, dir.name, 'SKILL.md');
-    let content = '';
-    if (fs.existsSync(skillMdPath)) {
-      content = fs.readFileSync(skillMdPath, 'utf8');
-    } else if (options.dryRun) {
-      content = fs.readFileSync(path.join(sourcePiSkills, dir.name, 'SKILL.md'), 'utf8');
+    const targetSkillDir = path.join(options.skillsDir, dir.name);
+    const mdFiles = [path.join(targetSkillDir, 'SKILL.md')];
+    const refDir = path.join(targetSkillDir, 'references');
+    if (fs.existsSync(refDir)) {
+      for (const rf of fs.readdirSync(refDir)) {
+        if (rf.endsWith('.md')) mdFiles.push(path.join(refDir, rf));
+      }
     }
 
-    if (content) {
+    for (const filePath of mdFiles) {
+      if (!fs.existsSync(filePath) && !options.dryRun) continue;
+      let content = fs.existsSync(filePath)
+        ? fs.readFileSync(filePath, 'utf8')
+        : fs.readFileSync(path.join(sourcePiSkills, dir.name, path.relative(targetSkillDir, filePath)), 'utf8');
+
       content = content.replace(
         /node "<skill-dir>\/\.\.\/\.\.\/companion\/agy-companion\.mjs"/g,
-        'node "$HOME/.agy-staff/companion/agy-companion.mjs"'
+        `node "\${AGY_STAFF_HOME:-${runtimePosix}}/companion/agy-companion.mjs"`
       );
       content = content.replace(
         /This skill file lives at `<plugin-root>\/pi-skills\/[^`]+`; resolve the companion path relative to this skill directory:/g,
-        'The agy-staff companion runtime is located at `~/.agy-staff/companion/agy-companion.mjs`:'
+        `The agy-staff companion runtime is located at \`\${AGY_STAFF_HOME:-${isCustomRuntime ? runtimePosix : '~/.agy-staff'}}/companion/agy-companion.mjs\`:`
+      );
+      content = content.replace(
+        /This file lives at `<plugin-root>\/pi-skills\/agy-jobs\/SKILL\.md`:/g,
+        `The agy-staff companion runtime is located at \`\${AGY_STAFF_HOME:-${isCustomRuntime ? runtimePosix : '~/.agy-staff'}}/companion/agy-companion.mjs\`:`
       );
       content = content.replace(
         /This skill lives at `<plugin-root>\/pi-skills\/agy-lead\/SKILL\.md`\. Write the brief to a temporary file and call the shared companion:/g,
         'Write the brief to a temporary file and call the shared companion:'
       );
+      content = content.replace(
+        /`\.\.\/\.\.\/docs\/REFERENCE\.md`/g,
+        '`docs/REFERENCE.md` in the agy-staff documentation or repository'
+      );
 
       if (!options.dryRun) {
-        fs.writeFileSync(skillMdPath, content, 'utf8');
+        fs.writeFileSync(filePath, content, 'utf8');
       }
-      convertedCount++;
     }
+    convertedCount++;
   }
 }
 log.success(`成功转换并安装了 ${convertedCount} 个扁平标准技能`);

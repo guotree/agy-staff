@@ -107,7 +107,9 @@ function agyCommand(args) {
   if (/\.(mjs|cjs|js)$/i.test(AGY_BIN)) return { cmd: process.execPath, args: [AGY_BIN, ...args] };
   return { cmd: AGY_BIN, args };
 }
-const AGY_SETTINGS = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
+const AGY_SETTINGS = process.env.AGY_SETTINGS_FILE
+  || process.env.ANTIGRAVITY_SETTINGS
+  || path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
 
 const MODES = ['staffer', 'research', 'review', 'implement', 'ask'];
 

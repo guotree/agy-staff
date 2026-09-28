@@ -59,7 +59,7 @@ Pi Agent 标准体系                    全局共享运行时 (~/.agy-staff)
 ├── agy-ask/SKILL.md ---------\
 ├── agy-researcher/SKILL.md ---\
 ├── agy-staffer/SKILL.md -------\
-├── agy-reviewer/SKILL.md -------> node "$HOME/.agy-staff/companion/agy-companion.mjs"
+├── agy-reviewer/SKILL.md -------> node "${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs"
 ├── agy-implementer/SKILL.md ---/               |
 ├── agy-lead/SKILL.md ---------/                v
 └── agy-jobs/SKILL.md --------/     [companion/ & templates/]
@@ -99,15 +99,33 @@ node ./scripts/install-clean-pi.mjs
   ```bash
   node ./scripts/install-clean-pi.mjs --test
   ```
-* **自定义目标路径**：
+* **强制同步运行时（Sync-Runtime）**：即使检测到 `~/.agy-staff` 运行时已健康完整，也强制覆盖同步最新代码（别名 `--force-runtime`）：
+  ```bash
+  node ./scripts/install-clean-pi.mjs --sync-runtime
+  ```
+* **自定义目标路径**（安装器将自动动态重定向已部署技能）：
   ```bash
   node ./scripts/install-clean-pi.mjs --runtime-dir ~/.my-agy --skills-dir ~/.pi/agent/skills
   ```
+* **自定义配置文件或源码目录**：
+  ```bash
+  node ./scripts/install-clean-pi.mjs --settings-file ~/.pi/agent/settings.json --source-repo /path/to/agy-staff
+  ```
+* **跳过 WSL 互通链接**（Windows 下纯原生环境）：
+  ```bash
+  node ./scripts/install-clean-pi.mjs --no-wsl
+  ```
 
-### 3. 工具内部的自适应机制
+### 3. 支持的环境变量
+脚本与技能原生支持以下环境变量覆盖：
+- `AGY_STAFF_HOME`：全局共享运行时位置（覆盖默认的 `~/.agy-staff`）。
+- `PI_CODING_AGENT_DIR` 或 `PI_HOME`：Pi Agent 配置根目录（覆盖默认的 `~/.pi/agent`）。
+
+### 4. 工具内部的自适应机制
 1. **清理旧包零外部依赖**：直接解析 `settings.json` 剔除 Package 声明并清理深层 Git 缓存，不依赖特定的 `pi` / `npm` / `nvm` 外部命令行路径。
-2. **WSL 动态安全检测**：仅当检测到真实活动的 WSL 发行版时才尝试配置；通过 `wslpath` 动态计算 Linux 内部真实挂载路径，杜绝手工拼接 `/mnt/c/Users`。
+2. **WSL 动态安全检测**：仅当检测到真实活动的 WSL 发行版且不存在实体目录冲突时才配置；通过 `wslpath` 动态计算 Linux 挂载路径，杜绝手工拼接。
 3. **Shell 智能动态探测与保护**：自动沿系统 PATH 中的 `git.exe` 倒推 Git Bash，同时扫描常见安装候选池；若用户已有现成的有效配置，坚决保持不变。
+4. **共享运行时按需智能检测**：自动校验 `~/.agy-staff/companion/agy-companion.mjs` 语法与 `templates/` 文件完整性。如果已由 Hermes Agent 或先前安装初始化且处于健康状态，**自动跳过运行时复制**，仅部署 Pi 技能；若需更新可传入 `--sync-runtime`。
 
 ---
 
@@ -128,12 +146,12 @@ cp -r templates "$HOME/.agy-staff/"
 
 ### 步骤 3：部署与改造 7 个技能
 1. 复制仓库中 `pi-skills/` 下的所有目录至 Pi 用户目录 `~/.pi/agent/skills/`。
-2. 将每个技能中 `SKILL.md` 的调用命令替换为标准引用：
+2. 将每个技能中 `SKILL.md` 及 `references/` 的调用命令替换为标准引用：
    ```bash
-   node "$HOME/.agy-staff/companion/agy-companion.mjs" <persona> [flags]
+   node "${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs" <persona> [flags]
    ```
    > [!TIP]
-   > 使用 `$HOME` 变量可以保证无论是 Windows 原生 PowerShell、Git Bash 还是 Linux Bash 都能无缝展开为正确的用户主目录。
+   > 采用 `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}` 级联展开语法：既允许配置 `AGY_STAFF_HOME` 环境变量自定义运行时，又在 Windows 下优先使用 `$USERPROFILE` 杜绝 MSYS `/c/Users` 路径解析崩溃，在 Linux/macOS 下安全回退到 `$HOME`。
 
 ### 步骤 4：验证 Pi 识别状态
 在终端中执行测试 Node 代码，确认 Pi 成功识别技能且无任何报错：
@@ -144,6 +162,8 @@ console.log(loadSkills({ agentDir: "C:/Users/<user>/.pi/agent", skillPaths: [], 
 
 ---
 
+<a id="五windows-wsl-混合环境防坑指南"></a>
+<a id="五windows--wsl-混合环境防坑指南"></a>
 ## 五、Windows / WSL 混合环境防坑指南
 
 在 Windows 机器上使用 Pi 时，最容易出现的故障是 **Shell 降级踩坑**：
@@ -182,5 +202,5 @@ Pi 内部使用 `where bash` 查找默认 Shell。如果 Git 安装在非标准�
 | 操作 | 传统官方方法 | 本方案（解耦共享运行时） |
 | :--- | :--- | :--- |
 | **升级代码** | `pi update --extension git:...`（常遇 git 锁或无法拉取） | 直接更新 `~/.agy-staff` 下的 `companion` 与 `templates` 即可，**无需动 Pi** |
-| **测试连通** | 必须进入 Pi 对话中测试 | 随时在普通命令行运行 `node "$HOME/.agy-staff/companion/agy-companion.mjs" ask` |
+| **测试连通** | 必须进入 Pi 对话中测试 | 随时在普通命令行运行 `node "${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs" ask` |
 | **清理卸载** | `pi remove` 后留下一堆缓存 | 直接删除 `~/.pi/agent/skills/agy-*` 与 `~/.agy-staff`，干净彻底 |

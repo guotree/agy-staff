@@ -4,7 +4,7 @@
 
 ## 模式与默认值
 
-插件提供五种角色（persona），每种角色对应一个技能。你选择角色并描述任务，主 agent 就会按照技能中的说明调用 companion CLI。companion 是插件自带的 Node.js 程序，负责启动 agy、保存任务状态和收取结果。
+插件共提供 7 个技能：5 个核心执行角色（persona）、1 个任务编排角色（`lead`），以及 1 个负责任务管理的技能（`jobs`）。你选择角色并描述任务，主 agent 就会按照技能中的说明调用 companion CLI。companion 是插件自带的 Node.js 程序，负责启动 agy、保存任务状态和收取结果。
 
 | 角色技能 | companion 命令 | 用途 | 默认模型 | 执行方式 |
 | --- | --- | --- | --- | --- |
@@ -13,18 +13,19 @@
 | `researcher` | `research` | 调研并引用来源，注明尚未验证的结论 | `gemini-3.8-flash-high` | 返回后台任务 ID |
 | `reviewer` | `review` | 审查代码、方案或决策 | `gemini-3.8-flash-medium` | 返回后台任务 ID |
 | `implementer` | `implement` | 完成范围明确的编码任务 | `gemini-3.8-flash-high` | 返回后台任务 ID |
+| `lead` | *(任务编排)* | 为当前主 agent 提供任务编排指导，拆解任务并委派给 `staffer`，验收并整合结果 | *(继承)* | 主 agent 负责编排 |
 
-`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`，Pi 使用 `/skill:agy-lead`。
+`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`，Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`。
 
 `staffer` 不预设专业分工或固定的报告格式，但仍遵守共享的操作约定。`reviewer` 会根据对象选择审查方式：代码问题按严重程度列出，并附上 `file:line` 位置；方案和决策审查则检查假设、风险和取舍。`implementer` 可以直接修改工作区，也可以完成任务明确要求的提交、推送或 PR 操作。
 
 执行方式由模式决定，不能通过参数切换。继续一个 `ask` 会话时，答案仍在同一次调用中返回；继续其他模式时，会创建新的后台任务。
 
-Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`。三者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
+Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`。四者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
 
-Pi 加载的入口位于 `pi-skills/`，由 `npm run generate:pi` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
+Pi 加载的入口位于 `pi-skills/`，Hermes Agent 加载的入口位于 `hermes-skills/`，分别由 `npm run generate:pi` 和 `npm run generate:hermes` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
 
-任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi 中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
+任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi 和 Hermes 中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
 
 <a id="双权限档模型"></a>
 
@@ -345,6 +346,8 @@ AGY 会读取工作区中的 `AGENTS.md`、`GEMINI.md` 和 `.agents/rules/*.md`�
 
 Windows 为尽力支持，由 CI 的 `Tests (Windows)` 任务覆盖，尚未在真实的 Windows `agy` 安装上验证。子进程均以 `windowsHide: true` 启动，避免后台执行期间弹出控制台窗口。任务取消与进程清理通过 PowerShell（`Get-CimInstance Win32_Process`，`CreationDate` 使用往返精度）发现子孙进程，并逐个终止已确认身份的成员；组长进程使用 `taskkill /PID <pid> /F`，不再使用 `/T`。父子链接只有在子进程创建时间晚于父进程时才被采信：Windows 会在 `ParentProcessId` 中保留已退出父进程的 PID，该 PID 被复用后，一个无关的孤儿进程（通常是另一个任务的后台 worker）否则会被误认为子孙而被杀掉。状态锁针对 Windows 目录与标记文件的重命名和删除瞬态错误（`EPERM`/`EBUSY`/`EACCES`）进行了自动重试。
 
+在 Windows Git Bash 环境下，默认预设的 `alias node="winpty node.exe"` 别名会劫持非交互式命令行调用，在自动化 Agent 管道中引发 `stdin is not a tty` 异常。解耦安装器采用宿主零污染策略优雅隔离：在 Hermes Agent 中，方案 A 通过生成 `<hermes-home>/hermes-terminal-init.sh` 并安全注册到 `config.yaml`（`terminal.shell_init_files`），仅在 Agent 子终端内解除 `node` 别名，完全不污染宿主系统的 `~/.bash_profile` 或 `~/.bashrc`；在 Pi Agent 中，通过 `settings.json` 指派原生 Git Bash 规避别名拦截。所有跨平台技能调用均采用 `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs` 级联展开，杜绝盘符解析错误。
+
 ## 升级
 
 Claude Code 和 Codex 按版本号缓存插件，例如 `cache/agy-staff/agy/0.4.0`。缓存是否需要更新取决于版本号，而不是仓库的最新提交。因此，准备发布时需要同步更新两个插件 manifest 和 `package.json` 中的版本。
@@ -363,13 +366,33 @@ Claude Code 和 Codex 按版本号缓存插件，例如 `cache/agy-staff/agy/0.4
 
 ### Pi
 
-Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接读取检出目录。没有固定版本的 Git 安装可以运行 `pi update --extension git:github.com/keli-wen/agy-staff`，然后在 Pi 中执行 `/reload`。
+Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接读取检出目录。没有固定版本的 Git 安装可以运行 `pi update --extension git:github.com/keli-wen/agy-staff`，然后在 Pi 中执行 `/reload`。如果采用一键解耦安装（`node scripts/install-clean-pi.mjs`），升级只需同步更新 `~/.agy-staff` 运行时即可，无需重新安装技能。
 
 本地开发时，在检出目录运行 `npm run generate:pi`，再执行 `/reload` 即可加载技能修改，无需先推送到远端。
 
+### Hermes Agent
+
+对于采用一键解耦安装的 Hermes Agent（`node scripts/install-clean-hermes.mjs`），后续升级同样只需同步更新 `~/.agy-staff` 全局运行时，Hermes 本地的技能目录（`<hermes-home>/skills/agy-staff/`）将自动调用最新的伴侣脚本，零侵入无感升级。
+
+本地开发时，在检出目录运行 `npm run generate:hermes` 即可重新生成 Hermes 技能入口。
+
+## 环境变量
+
+伴侣运行时与一键解耦安装器支持通过环境变量进行动态灵活配置：
+
+| 环境变量 | 作用组件 | 作用说明 | 默认值 |
+|---|---|---|---|
+| `AGY_STAFF_HOME` | 共享运行时与技能 | 覆盖全局共享运行时 `companion/` 与 `templates/` 的物理位置 | `~/.agy-staff`（Windows 下为 `%USERPROFILE%\.agy-staff`） |
+| `AGY_BIN` | 伴侣运行时 | 指定 `agy` CLI 二进制路径或测试脚本 | `agy` |
+| `AGY_SETTINGS_FILE` / `ANTIGRAVITY_SETTINGS` | 伴侣运行时 | 指定 Antigravity CLI 权限配置文件的绝对路径 | `~/.gemini/antigravity-cli/settings.json` |
+| `HERMES_HOME` | Hermes 安装器 | 覆盖 Hermes Agent 数据根目录 | Windows: `%LOCALAPPDATA%\hermes`, Unix: `~/.hermes` |
+| `HERMES_SKILLS_DIR` | Hermes 安装器 | 覆盖 Hermes 技能安装目标父目录 | `<hermes-home>/skills` |
+| `HERMES_SKILLS_CATEGORY` | Hermes 安装器 | 技能在 Hermes 中的分类名称 | `agy-staff` |
+| `PI_CODING_AGENT_DIR` / `PI_HOME` | Pi 安装器 | 覆盖 Pi Agent 配置根目录 | `~/.pi/agent` |
+
 ## 仓库结构
 
-`skills/` 是角色技能的源文件，`pi-skills/` 是为 Pi 生成的入口。两者共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
+`skills/` 是角色技能的源文件，`pi-skills/` 是为 Pi 生成的入口，`hermes-skills/` 是为 Hermes Agent 生成的标准入口。它们共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
 
 ```text
 companion/agy-companion.mjs    命令入口、模式选择、任务管理与 setup
@@ -378,8 +401,12 @@ companion/observation.mjs      事件解析、进度快照与输出长度限制
 companion/state-lock.mjs       状态更新与锁回收
 skills/                       角色技能与 jobs 管理技能，以及按需加载的参考文件
 pi-skills/                    自动生成的 Pi 入口与参考文件，不应手动编辑
+hermes-skills/                自动生成的 Hermes Agent 标准入口与参考文件，不应手动编辑
 templates/                    共享提示词模板与宿主兼容说明
 scripts/generate-pi-skills.mjs  生成 Pi 技能并检查一致性
+scripts/generate-hermes-skills.mjs 生成 Hermes 技能并检查一致性
+scripts/install-clean-pi.mjs   Pi Agent 一键解耦安装与环境适配工具
+scripts/install-clean-hermes.mjs Hermes Agent 一键解耦安装与分类适配工具
 .claude-plugin/               Claude Code 插件与插件市场配置
 .codex-plugin/plugin.json     Codex 插件配置
 .agents/plugins/              Codex 插件市场配置

@@ -11,12 +11,13 @@ Back to the [README](../README.md). See the [Chinese reference](REFERENCE.zh-CN.
 | `researcher` | `research` | Deep survey with cited sources and explicit unverified-claims marking | `gemini-3.8-flash-high` | unrestricted | background job — returns a job id |
 | `reviewer` | `review` | Second-opinion verifier, two flavors routed by subject: code review (severity-ranked findings with `file:line` refs) and general review (multi-angle challenge of a plan, design, or decision) | `gemini-3.8-flash-medium` | unrestricted | background job — returns a job id |
 | `implementer` | `implement` | Well-scoped coding task; agy edits the working tree and can perform explicitly requested Git delivery | `gemini-3.8-flash-high` | unrestricted | background job — returns a job id |
+| `lead` | *(orchestration)* | Task orchestration guidance for the host agent; breaks down tasks, delegates substantive work to `staffer`, and integrates results | *(inherits)* | *(inherits)* | host-orchestrated |
 
-`lead` provides task orchestration guidance for the current agent, reusing the existing companion modes without adding a mode of its own; invoke `/agy:lead` in Claude Code, `$agy:lead` in Codex, or `/skill:agy-lead` in Pi.
+`lead` provides task orchestration guidance for the current agent, reusing the existing companion modes without adding a mode of its own; invoke `/agy:lead` in Claude Code, `$agy:lead` in Codex, `/skill:agy-lead` in Pi, or `/skill agy-lead` in Hermes.
 
 Execution style is fixed per mode and cannot be overridden by a flag. `continue` inherits the resolved mode's style (continuing an `ask` stays synchronous; continuing the others returns a job id).
 
-Claude Code, Codex, and Pi surface the same personas, backed by one companion script (`companion/agy-companion.mjs`, Node stdlib only) and shared prompt templates (`templates/`). Invocation tokens: `/agy:<persona>` on Claude Code, `$agy:<persona>` on Codex, and `/skill:agy-<persona>` on Pi. Pi's manifest exposes only `pi-skills/`, generated mechanically from canonical `skills/` via `npm run generate:pi`. Generated skills use `agy-` prefixes, rewrite sibling references, and append `templates/harness-compatibility.md` (directing the host to adapt missing tools to equivalent methods without dropping requirements, or ask for help). Job management (`wait`/`status`/`result`/`cancel`/`continue`/`setup`) lives in `jobs` (`agy-jobs` on Pi) plus the companion CLI — ask for it in natural language ("is the agy job done?").
+Claude Code, Codex, Pi, and Hermes Agent surface the same personas, backed by one companion script (`companion/agy-companion.mjs`, Node stdlib only) and shared prompt templates (`templates/`). Invocation tokens: `/agy:<persona>` on Claude Code, `$agy:<persona>` on Codex, `/skill:agy-<persona>` on Pi, and `/skill agy-<persona>` on Hermes. Pi's manifest exposes `pi-skills/`, generated mechanically from canonical `skills/` via `npm run generate:pi`. Hermes Agent exposes `hermes-skills/`, generated via `npm run generate:hermes`. Generated skills use `agy-` prefixes, rewrite sibling references, and append `templates/harness-compatibility.md` (directing the host to adapt missing tools to equivalent methods without dropping requirements, or ask for help). Job management (`wait`/`status`/`result`/`cancel`/`continue`/`setup`) lives in `jobs` (`agy-jobs` on Pi and Hermes) plus the companion CLI — ask for it in natural language ("is the agy job done?").
 
 ## The two-profile permission model
 
@@ -255,15 +256,32 @@ If the installed `agy` CLI does not support Gemini 3.8 Flash, the companion fail
 
 Windows is supported on a best-effort basis and exercised by the `Tests (Windows)` CI job; it has not yet been validated against a real Windows `agy` installation. Subprocesses are spawned with `windowsHide: true` so no console windows appear during background execution. Job cancellation and process cleanup discover descendant processes via PowerShell (`Get-CimInstance Win32_Process`, with `CreationDate` in round-trip precision) and terminate each identified member individually; the leader falls to `taskkill /PID <pid> /F`, never `/T`. A parent link is only followed when the child was created after its parent: Windows keeps a dead parent's PID in `ParentProcessId`, so once that PID is reused an unrelated orphan (typically another job's detached worker) would otherwise look like a descendant and be killed. State locking retries transient Windows errors (`EPERM`/`EBUSY`/`EACCES`) when renaming or unlinking lock directories and marker files.
 
+Under Windows Git Bash, default aliases such as `alias node="winpty node.exe"` hijack non-interactive CLI calls, producing `stdin is not a tty` errors in automated agent pipes. The clean decoupled installers isolate this with zero host pollution: for Hermes Agent, Plan A registers `<hermes-home>/hermes-terminal-init.sh` in `config.yaml` (`terminal.shell_init_files`) to unalias `node` strictly within the agent's sub-terminals without touching `~/.bash_profile` or `~/.bashrc`; for Pi Agent, `settings.json` specifies native Git Bash without alias interception. Cross-platform skill invocations safely expand via `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs`.
+
 ## Upgrading
 
-Claude Code and Codex cache the plugin under a per-**version** directory (e.g. `cache/agy-staff/agy/0.4.0`) and key "is it current?" on that version string, not on the commit. Bump their manifests and `package.json` together when preparing a release. Pi's Git source instead follows the configured ref; local sources read the checkout directly.
+Claude Code and Codex cache the plugin under a per-**version** directory (e.g. `cache/agy-staff/agy/0.4.0`) and key "is it current?" on that version string, not on the commit. Bump their manifests and `package.json` together when preparing a release. Pi's Git source instead follows the configured ref; local sources read the checkout directly. For Pi and Hermes, clean decoupled installations update via the shared runtime.
 
 - **Claude Code** — `claude plugin marketplace update agy-staff` refreshes the marketplace clone, then `claude plugin update agy@agy-staff` re-copies it into the cache. `install` is **not** the upgrade command: on an already-installed plugin it answers "already installed" and does nothing, whatever the version. And `update` only moves if the version string changed — on an unchanged version it answers "already at the latest version" and leaves the old commit in place. Force the current commit in with `claude plugin uninstall agy@agy-staff && claude plugin install agy@agy-staff`. Restart Claude Code afterwards either way — skills are registered at session start.
 - **Codex** — bump the version, run `codex plugin marketplace upgrade` (or remove and re-add the marketplace entry), then restart the app.
-- **Pi** — for an unpinned Git install, run `pi update --extension git:github.com/keli-wen/agy-staff`, then `/reload`. For local development, regenerate Pi skills (`npm run generate:pi`) and run `/reload`; no push is needed.
+- **Pi** — for an unpinned Git install, run `pi update --extension git:github.com/keli-wen/agy-staff`, then `/reload`. For clean decoupled installs (`node scripts/install-clean-pi.mjs`), updating `~/.agy-staff` is sufficient without reinstalling skills. For local development, regenerate Pi skills (`npm run generate:pi`) and run `/reload`; no push is needed.
+- **Hermes** — for clean decoupled installs (`node scripts/install-clean-hermes.mjs`), updating `~/.agy-staff` is sufficient without reinstalling skills. Local skills in `<hermes-home>/skills/agy-staff` automatically stay up to date with the shared companion. For local development, regenerate Hermes skills (`npm run generate:hermes`); no push is needed.
 
 You can check which commit is actually installed: the `gitCommitSha` in `~/.claude/plugins/installed_plugins.json`, versus `git -C ~/.claude/plugins/marketplaces/agy-staff log -1` for what the marketplace clone has fetched.
+
+## Environment variables
+
+The companion runtime and clean installers support dynamic configuration through environment variables:
+
+| Variable | Target | Purpose | Default |
+|---|---|---|---|
+| `AGY_STAFF_HOME` | Runtime & Skills | Overrides the location of the central `companion/` and `templates/` directory | `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) |
+| `AGY_BIN` | Companion | Overrides the name or path of the `agy` binary / test fake | `agy` |
+| `AGY_SETTINGS_FILE` / `ANTIGRAVITY_SETTINGS` | Companion | Overrides the target path for Antigravity CLI permission settings | `~/.gemini/antigravity-cli/settings.json` |
+| `HERMES_HOME` | Hermes Installer | Overrides Hermes data root directory | Windows: `%LOCALAPPDATA%\hermes`, Unix: `~/.hermes` |
+| `HERMES_SKILLS_DIR` | Hermes Installer | Overrides target skills root directory | `<hermes-home>/skills` |
+| `HERMES_SKILLS_CATEGORY` | Hermes Installer | Overrides the category namespace for skills | `agy-staff` |
+| `PI_CODING_AGENT_DIR` / `PI_HOME` | Pi Installer | Overrides Pi agent configuration directory | `~/.pi/agent` |
 
 ## Repository layout
 
@@ -277,7 +295,11 @@ templates/                    shared prompt templates (staffer/ask/research/revi
 .codex-plugin/plugin.json     Codex plugin manifest
 .agents/plugins/              Codex marketplace manifest
 pi-skills/                    generated agy-* entrypoints/resources for Pi; do not hand-edit
+hermes-skills/                generated agy-* entrypoints/resources for Hermes; do not hand-edit
 scripts/generate-pi-skills.mjs generates Pi skills and checks for drift
+scripts/generate-hermes-skills.mjs generates Hermes skills and checks for drift
+scripts/install-clean-pi.mjs   cross-platform clean installer for Pi Agent
+scripts/install-clean-hermes.mjs cross-platform clean installer for Hermes Agent
 package.json                  Pi manifest, npm file allowlist, and verification commands
 skills/                       canonical personas + jobs (Claude/Codex entrypoints;
                               reviewer/ and jobs/ carry references/ for on-demand detail)
