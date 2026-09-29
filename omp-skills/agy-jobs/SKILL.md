@@ -1,7 +1,6 @@
 ---
 name: agy-jobs
 description: "Manage agy staffer background jobs - collect results, check status, cancel, follow-up conversation, and setup. Use when an agy job needs collecting, when the user asks \"is the agy job done\", \"show agy's result\", \"cancel the agy job\", \"continue the agy conversation\", or \"set up agy\". This is the orchestrator's skill; the persona skills (staffer/researcher/reviewer/implementer) point here."
-allowed-tools: Bash(node:*), AskUserQuestion
 user-invocable: false
 version: 0.7.3
 author: agy-staff

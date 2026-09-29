@@ -2,7 +2,6 @@
 name: agy-staffer
 description: "Delegate a general-purpose task to Google's Antigravity CLI (agy staffer, fast Gemini) with a minimal, unopinionated prompt. Use when the user says /skill:agy-staffer, \"have agy do/handle X\", \"have agy generate an image\", or the task fits none of the specialist personas (researcher / reviewer / implementer / ask) — the template adds no role, rules, or output format, so the task text alone shapes the output. Also the route to agy-native tools no specialist covers, notably image generation (generate_image)."
 argument-hint: '[--restricted|--unrestricted] [--model <id>|--effort low|medium|high] [--timeout <dur>] [--prompt-file <path>|--stdin] "task"'
-allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), Bash(gh:*)
 version: 0.7.3
 author: agy-staff
 license: MIT

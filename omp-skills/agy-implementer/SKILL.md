@@ -2,7 +2,6 @@
 name: agy-implementer
 description: "Delegate a coding task to Google's Antigravity CLI (agy staffer, fast Gemini), which edits the working tree directly and can perform explicitly requested Git delivery. Use when the user says /skill:agy-implementer, \"have agy fix/build X\", or wants to hand a well-scoped coding task to the agy staffer instead of doing it in the host model."
 argument-hint: '[--continue] [--restricted|--unrestricted] [--model <id>|--effort low|medium|high] [--prompt-file <path>|--stdin] "task description"'
-allowed-tools: Read, Glob, Grep, Bash(node:*), Bash(git:*), Bash(gh:*)
 version: 0.7.3
 author: agy-staff
 license: MIT

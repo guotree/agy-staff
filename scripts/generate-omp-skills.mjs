@@ -4,8 +4,8 @@
  *
  * Generates decoupled Oh My Pi (omp) skills from canonical skills/.
  * Supports Oh My Pi skill directory (~/.omp/agent/skills), namespaced entrypoints (/skill:agy-*),
- * multi-profile relocation, allowed-tools frontmatter, bash tool execution guidance, and cross-platform
- * companion invocation paths.
+ * multi-profile relocation, bash tool execution guidance, and cross-platform
+ * companion invocation paths. Omit Claude-specific allowed-tools to preserve Oh My Pi default toolset.
  *
  * No external dependencies.
  */
@@ -158,7 +158,6 @@ export function ompFiles(root = ROOT) {
           fullDesc = fullDesc.replace(/\/agy:([a-z0-9-]+)/g, '/skill:agy-$1');
 
           const hintMatch = /^argument-hint:\s*([^\n]+)/m.exec(match[1]);
-          const toolsMatch = /^allowed-tools:\s*([^\n]+)/m.exec(match[1]);
           const userInvocableMatch = /^user-invocable:\s*([^\n]+)/m.exec(match[1]);
 
           const frontmatterLines = [
@@ -167,8 +166,8 @@ export function ompFiles(root = ROOT) {
           ];
 
           if (hintMatch) frontmatterLines.push(`argument-hint: ${hintMatch[1]}`);
-          if (toolsMatch) frontmatterLines.push(`allowed-tools: ${toolsMatch[1]}`);
-          else frontmatterLines.push(`allowed-tools: Bash(node:*)`);
+          // Note: Claude-specific allowed-tools (e.g. Read, Bash(node:*)) are deliberately omitted
+          // so Oh My Pi can use its native toolset (read, bash, etc.) without restriction or schema errors.
           if (userInvocableMatch) frontmatterLines.push(`user-invocable: ${userInvocableMatch[1]}`);
 
           frontmatterLines.push(

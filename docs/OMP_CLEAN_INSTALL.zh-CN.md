@@ -70,6 +70,10 @@ Oh My Pi 与原生 Pi 相比，有两大重要机制特性：
    - Oh My Pi 采用 `config.yml` 代替了旧版 `settings.json`。解耦安装器直接部署纯净扁平技能，零配置侵入，绝不污染系统全局配置。
 3. **命令契约**：
    - 技能以 `/skill:agy-<persona>` 触发（如 `/skill:agy-ask`、`/skill:agy-jobs`），并在终端输入时支持自动补全推荐。
+4. **工具集规范适配（移除 Claude 特有的 allowed-tools 限制）**：
+   - Claude Code / Codex 中的 `allowed-tools: Read, Glob, Grep, Bash(node:*)` 采用 PascalCase 及独有的权限过滤器语法。
+   - 在 Oh My Pi 中，内置工具采用小写命名规范（`read`、`bash` 等）。若直接沿用 Claude 的 `allowed-tools`，会导致 `Read` 无法被识别为内置的 `read` 工具，造成工具被意外过滤，进而引发模型将读文件请求错派给 `bash` 工具（抛出 `Validation failed for tool "bash": command must be a string`）。
+   - 因此，Oh My Pi 的技能规范中不施加 Claude 风格的 `allowed-tools` 限制，保留 Oh My Pi 默认的完整工具生态，保障 `read`、`bash` 等原生工具顺畅工作。
 
 ---
 
@@ -132,9 +136,10 @@ node ./scripts/install-clean-omp.mjs --profile work
 
 在 Oh My Pi 中运行 `agy-staff` 时的注意事项：
 
-1. **Bash 执行权限**：Oh My Pi 内置 `bash` 工具执行命令。技能提示词指引模型通过 `bash` 工具调度 `node` 伴侣脚本。
-2. **凭据与端口访问**：`agy` 启动时需访问本地端口及 `~/.gemini/antigravity-cli/` 下的身份令牌。
-3. **Windows PowerShell 兼容**：若在纯 Windows PowerShell 环境下无法解析 `${VAR:-DEFAULT}` 语法，伴侣指令支持直接以 `node "$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs"` 运行。
+1. **原生工具集保留与零干扰**：技能前端元数据不注入 Claude 特有的 `allowed-tools` 约束，确保 Oh My Pi 内置的 `read`、`bash`、`edit` 等工具均正常可用，杜绝因 `Read` 大小写不匹配而丢失 `read` 工具、甚至误调 `bash` 的现象。
+2. **Bash 执行权限与命令契约**：Oh My Pi 内置 `bash` 工具用于执行命令，要求传参为 `{ command: string }`。技能提示词指引模型通过 `bash` 工具调度 `node` 伴侣脚本。
+3. **凭据与端口访问**：`agy` 启动时需访问本地端口及 `~/.gemini/antigravity-cli/` 下的身份令牌。
+4. **Windows PowerShell 兼容**：若在纯 Windows PowerShell 环境下无法解析 `${VAR:-DEFAULT}` 语法，伴侣指令支持直接以 `node "$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs"` 运行。
 
 ---
 

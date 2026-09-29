@@ -300,6 +300,10 @@ omp skill list
 
 All 7 skills should appear in the resolved skills list.
 
+> [!NOTE]
+> **Oh My Pi toolset note**:
+> Skills deployed for Oh My Pi omit Claude-specific `allowed-tools` frontmatter, preserving Oh My Pi's native toolset (`read`, `bash`, etc.) without casing conflicts or unexpected parameter validation failures.
+
 ## 3. Smoke test
 
 Run the zero-setup ask mode — it needs no allowlist and answers in ~3 seconds:

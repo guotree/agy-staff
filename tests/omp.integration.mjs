@@ -31,9 +31,11 @@ test('Oh My Pi: generated skills adhere to Oh My Pi format and frontmatter', () 
     const fmLines = match[1].split('\n');
     assert.ok(fmLines.some(l => l.startsWith(`name: ${skillName}`)), `name must be ${skillName}`);
     assert.ok(fmLines.some(l => l.startsWith('description:')), 'description must be present');
-    if (skillName !== 'agy-lead') {
-      assert.ok(fmLines.some(l => l.startsWith('allowed-tools:')), `${skillName} must have allowed-tools`);
-    }
+    // Claude-specific allowed-tools should be omitted so Oh My Pi's native toolset is not restricted
+    assert.ok(
+      !fmLines.some(l => l.startsWith('allowed-tools:')),
+      `${skillName} must not contain allowed-tools`
+    );
 
     // Check cross-platform path rewriting and configurable AGY_STAFF_HOME
     assert.ok(

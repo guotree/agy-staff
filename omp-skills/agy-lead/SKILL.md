@@ -2,7 +2,6 @@
 name: agy-lead
 description: "Orchestrate an ongoing task with AGY while the current agent owns key decisions, review, and delivery. Use when the user invokes /skill:agy-lead or asks you to coordinate a task using AGY."
 argument-hint: '[task]'
-allowed-tools: Bash(node:*)
 version: 0.7.3
 author: agy-staff
 license: MIT
