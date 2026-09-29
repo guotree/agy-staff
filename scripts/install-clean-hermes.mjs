@@ -40,9 +40,143 @@ function detectHermesHome() {
   return path.join(homeDir, '.hermes' + suffix);
 }
 
-// 命令行参数与环境变量解析
-const args = process.argv.slice(2);
-const options = {
+/**
+ * 清理历史残留于宿主全局 profile (.bash_profile / .profile) 中的注入配置。
+ * 绝不直接删除用户文件；若清理后内容为空则保留空文件，并在修改前建立时间戳备份。
+ */
+export function cleanLegacyGlobalProfile(content) {
+  if (!content || !content.includes('agy-staff') || !content.includes('unalias node')) {
+    return { changed: false, cleaned: content, isEmpty: !content || content.trim().length === 0 };
+  }
+  const legacyRegex = /\r?\n?#\s*agy-staff[^\r\n]*(?:\r?\n\s*#[^\r\n]*)*\r?\n[^\r\n]*unalias node[^\r\n]*\r?\n?/g;
+  const cleaned = content.replace(legacyRegex, '');
+  if (cleaned === content) {
+    return { changed: false, cleaned: content, isEmpty: content.trim().length === 0 };
+  }
+  const trimmed = cleaned.trim();
+  return {
+    changed: true,
+    cleaned: trimmed.length > 0 ? trimmed + '\n' : '',
+    isEmpty: trimmed.length === 0,
+  };
+}
+
+/**
+ * 安全地向 Hermes config.yaml 中注入 terminal.shell_init_files 配置。
+ * 支持空配置、已有独立 terminal 配置、带注释配置、flow/block list 等任意 YAML 结构，
+ * 严禁在已有 terminal 配置时追加重复键。
+ */
+export function injectTerminalShellInitFile(yamlContent, posixInitPath) {
+  if (yamlContent.includes(posixInitPath)) {
+    return yamlContent;
+  }
+  const eol = yamlContent.includes('\r\n') ? '\r\n' : '\n';
+  const lines = yamlContent.split(/\r?\n/);
+
+  if (!yamlContent.trim()) {
+    return `terminal:${eol}  shell_init_files:${eol}    - ${posixInitPath}${eol}`;
+  }
+
+  const terminalIdx = lines.findIndex(l => /^(?:terminal|['"]terminal['"])\s*:(.*)$/.test(l));
+
+  if (terminalIdx === -1) {
+    const trimmed = yamlContent.trimEnd();
+    return `${trimmed}${eol}${eol}terminal:${eol}  shell_init_files:${eol}    - ${posixInitPath}${eol}`;
+  }
+
+  const termLine = lines[terminalIdx];
+  const match = termLine.match(/^(?:terminal|['"]terminal['"])\s*:(.*)$/);
+  const afterColon = match ? match[1].trim() : '';
+
+  if (afterColon === '{}') {
+    lines[terminalIdx] = `terminal:${eol}  shell_init_files:${eol}    - ${posixInitPath}`;
+    const result = lines.join(eol);
+    return result.endsWith(eol) ? result : result + eol;
+  }
+
+  if (/^\{.*\}$/.test(afterColon)) {
+    const inner = afterColon.slice(1, -1).trim();
+    const entries = inner ? inner.split(',').map(s => s.trim()).filter(Boolean) : [];
+    lines.splice(terminalIdx, 1,
+      'terminal:',
+      '  shell_init_files:',
+      `    - ${posixInitPath}`,
+      ...entries.map(e => `  ${e}`)
+    );
+    const result = lines.join(eol);
+    return result.endsWith(eol) ? result : result + eol;
+  }
+
+  let nextSectionIdx = lines.length;
+  for (let i = terminalIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().length > 0 && !/^\s*#/.test(line) && /^[^\s]/.test(line)) {
+      nextSectionIdx = i;
+      break;
+    }
+  }
+
+  let sifIdx = -1;
+  for (let i = terminalIdx + 1; i < nextSectionIdx; i++) {
+    if (/^\s*(?:shell_init_files|['"]shell_init_files['"])\s*:(.*)$/.test(lines[i])) {
+      sifIdx = i;
+      break;
+    }
+  }
+
+  if (sifIdx === -1) {
+    let childIndent = '  ';
+    for (let i = terminalIdx + 1; i < nextSectionIdx; i++) {
+      const m = lines[i].match(/^(\s+)[^\s#]/);
+      if (m) {
+        childIndent = m[1];
+        break;
+      }
+    }
+    const listIndent = childIndent + '  ';
+    lines.splice(terminalIdx + 1, 0,
+      `${childIndent}shell_init_files:`,
+      `${listIndent}- ${posixInitPath}`
+    );
+  } else {
+    const sifLine = lines[sifIdx];
+    const sm = sifLine.match(/^(\s*)(?:shell_init_files|['"]shell_init_files['"])\s*:(.*)$/);
+    const sifIndent = sm[1];
+    const sifRest = sm[2].trim();
+
+    if (sifRest === '[]') {
+      lines.splice(sifIdx, 1,
+        `${sifIndent}shell_init_files:`,
+        `${sifIndent}  - ${posixInitPath}`
+      );
+    } else if (/^\[.*\]$/.test(sifRest)) {
+      lines[sifIdx] = sifLine.replace(/\[\s*/, `['${posixInitPath}', `);
+    } else if (sifRest === '' || sifRest.startsWith('#')) {
+      let itemIndent = sifIndent + '  ';
+      if (sifIdx + 1 < nextSectionIdx) {
+        const nextLineMatch = lines[sifIdx + 1].match(/^(\s*)-\s+/);
+        if (nextLineMatch) {
+          itemIndent = nextLineMatch[1];
+        }
+      }
+      lines.splice(sifIdx + 1, 0, `${itemIndent}- ${posixInitPath}`);
+    } else {
+      lines.splice(sifIdx, 1,
+        `${sifIndent}shell_init_files:`,
+        `${sifIndent}  - ${sifRest}`,
+        `${sifIndent}  - ${posixInitPath}`
+      );
+    }
+  }
+
+  const result = lines.join(eol);
+  return result.endsWith(eol) ? result : result + eol;
+}
+
+export function runInstaller(rawArgs = process.argv.slice(2)) {
+  // 命令行参数与环境变量解析
+  const args = rawArgs;
+  const options = {
   dryRun: args.includes('--dry-run'),
   runTest: args.includes('--test'),
   forceRuntime: args.includes('--force-runtime') || args.includes('--sync-runtime'),
@@ -193,7 +327,12 @@ if (process.platform === 'win32' && !options.noWsl) {
         const wslTarget = wslPathProc.stdout.trim();
         log.dim(`解析到 WSL 挂载路径: ${wslTarget}`);
         if (!options.dryRun) {
-          spawnSync('wsl.exe', ['-e', 'bash', '-c', `[ -L ~/.agy-staff ] || [ ! -e ~/.agy-staff ] && ln -sfn "${wslTarget}" ~/.agy-staff`], {
+          spawnSync('wsl.exe', [
+            '-e', 'bash', '-c',
+            '[ -L ~/.agy-staff ] || [ ! -e ~/.agy-staff ] && ln -sfn "$1" ~/.agy-staff',
+            '--',
+            wslTarget
+          ], {
             timeout: 5000,
           });
         }
@@ -216,22 +355,27 @@ if (process.platform === 'win32') {
   log.info('[3/5] 配置 Hermes 终端原生隔离环境 (terminal.shell_init_files)...');
 
   // A. 安全检查并自动清理历史版本可能残留于全局家目录的注入标记（恢复宿主纯净）
-  const userHome = os.homedir();
+  const userHome = process.env.AGY_TEST_HOME ? path.resolve(process.env.AGY_TEST_HOME.trim()) : os.homedir();
   for (const pfName of ['.bash_profile', '.profile']) {
     const pfPath = path.join(userHome, pfName);
     if (fs.existsSync(pfPath)) {
       try {
         const content = fs.readFileSync(pfPath, 'utf8');
-        if (content.includes('agy-staff') && content.includes('unalias node')) {
-          const cleaned = content.replace(/\n?#\s*agy-staff.*?\nunalias node[^\n]*\n?/g, '').trim();
+        const cleanRes = cleanLegacyGlobalProfile(content);
+        if (cleanRes.changed) {
           if (!options.dryRun) {
-            if (cleaned.length === 0) {
-              fs.unlinkSync(pfPath);
-            } else {
-              fs.writeFileSync(pfPath, cleaned + '\n', 'utf8');
+            const bakPath = `${pfPath}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+            try {
+              fs.copyFileSync(pfPath, bakPath);
+            } catch (bakErr) {
+              log.warn(`备份 ${pfPath} 失败: ${bakErr.message}，跳过清理以保证文件安全`);
+              continue;
             }
+            fs.writeFileSync(pfPath, cleanRes.cleaned, 'utf8');
+            log.dim(`已安全清理历史残留的全局配置（保留文件并备份至 ${path.basename(bakPath)}）: ${pfPath}`);
+          } else {
+            log.dim(`[dry-run] 发现历史残留的全局配置待清理: ${pfPath}`);
           }
-          log.dim(`已安全清理历史残留的全局配置: ${pfPath}`);
         }
       } catch (err) {
         log.dim(`检查历史全局配置跳过: ${err.message}`);
@@ -254,56 +398,85 @@ if (process.platform === 'win32') {
   ].join('\n');
 
   if (!options.dryRun) {
-    fs.writeFileSync(initScriptPath, initScriptContent, 'utf8');
+    if (fs.existsSync(initScriptPath)) {
+      const existing = fs.readFileSync(initScriptPath, 'utf8');
+      if (existing !== initScriptContent) {
+        const initBak = `${initScriptPath}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        try { fs.copyFileSync(initScriptPath, initBak); } catch {}
+        fs.writeFileSync(initScriptPath, initScriptContent, 'utf8');
+      }
+    } else {
+      fs.writeFileSync(initScriptPath, initScriptContent, 'utf8');
+    }
   }
 
   // C. 绑定至 Hermes config.yaml 的 terminal.shell_init_files
   const configPath = path.join(options.hermesHome, 'config.yaml');
   let configUpdated = false;
 
-  // 优先尝试 Hermes CLI 原生设置命令
-  const hermesBinCandidates = [
-    path.join(options.hermesHome, 'bin', 'hermes.cmd'),
-    path.join(options.hermesHome, 'bin', 'hermes'),
-    'hermes',
-  ];
-  for (const candidate of hermesBinCandidates) {
-    if (candidate === 'hermes' || fs.existsSync(candidate)) {
-      try {
-        const check = spawnSync(candidate, ['--version'], { encoding: 'utf8', timeout: 3000 });
-        if (check.status === 0) {
-          const setRes = spawnSync(candidate, ['config', 'set', 'terminal.shell_init_files', `['${posixInitPath}']`], {
-            encoding: 'utf8',
-            timeout: 5000,
-          });
-          if (setRes.status === 0) {
-            configUpdated = true;
-            break;
+  const currentYaml = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
+  if (currentYaml.includes(posixInitPath)) {
+    configUpdated = true;
+    log.dim(`Hermes config.yaml 已存在 terminal.shell_init_files 绑定: ${posixInitPath}`);
+  } else if (options.dryRun) {
+    configUpdated = true;
+    log.dim(`[dry-run] 将向 Hermes 注册 terminal.shell_init_files: ${posixInitPath}`);
+  } else {
+    // 优先尝试 Hermes CLI 原生设置命令
+    const hermesBinCandidates = [
+      path.join(options.hermesHome, 'bin', 'hermes.cmd'),
+      path.join(options.hermesHome, 'bin', 'hermes'),
+      'hermes',
+    ];
+    for (const candidate of hermesBinCandidates) {
+      if (candidate === 'hermes' || fs.existsSync(candidate)) {
+        try {
+          const check = spawnSync(candidate, ['--version'], { encoding: 'utf8', timeout: 3000 });
+          if (check.status === 0) {
+            // 合并已有文件列表，避免全量覆盖破坏用户既有配置
+            let targetFiles = [posixInitPath];
+            try {
+              const getRes = spawnSync(candidate, ['config', 'get', 'terminal.shell_init_files'], { encoding: 'utf8', timeout: 3000 });
+              if (getRes.status === 0 && getRes.stdout) {
+                const raw = getRes.stdout.trim().replace(/^['"]|['"]$/g, '');
+                if (raw.startsWith('[') && raw.endsWith(']')) {
+                  const parsed = JSON.parse(raw.replace(/'/g, '"'));
+                  if (Array.isArray(parsed)) {
+                    targetFiles = Array.from(new Set([...parsed, posixInitPath]));
+                  }
+                }
+              }
+            } catch {}
+
+            if (fs.existsSync(configPath)) {
+              const configBak = `${configPath}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+              try { fs.copyFileSync(configPath, configBak); } catch {}
+            }
+
+            const formattedArray = JSON.stringify(targetFiles).replace(/"/g, "'");
+            const setRes = spawnSync(candidate, ['config', 'set', 'terminal.shell_init_files', formattedArray], {
+              encoding: 'utf8',
+              timeout: 5000,
+            });
+            if (setRes.status === 0) {
+              configUpdated = true;
+              break;
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
-  }
 
-  // CLI 不可用或离线时，进行安全的 YAML 声明式配置注入
-  if (!configUpdated) {
-    let yamlContent = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : '';
-    if (!yamlContent.includes(posixInitPath)) {
-      if (!yamlContent.trim()) {
-        yamlContent = `terminal:\n  shell_init_files:\n    - ${posixInitPath}\n`;
-      } else if (/^\s*shell_init_files:\s*\[\s*\]/m.test(yamlContent)) {
-        yamlContent = yamlContent.replace(/^\s*shell_init_files:\s*\[\s*\]/m, `  shell_init_files:\n    - ${posixInitPath}`);
-      } else if (/^\s*shell_init_files:\s*$/m.test(yamlContent)) {
-        yamlContent = yamlContent.replace(/^\s*shell_init_files:\s*$/m, `  shell_init_files:\n    - ${posixInitPath}`);
-      } else if (/^terminal:/m.test(yamlContent)) {
-        yamlContent = yamlContent.replace(/^terminal:\s*$/m, `terminal:\n  shell_init_files:\n    - ${posixInitPath}`);
-      } else {
-        yamlContent += `\nterminal:\n  shell_init_files:\n    - ${posixInitPath}\n`;
+    // CLI 不可用或离线时，进行安全的 YAML 声明式配置注入
+    if (!configUpdated) {
+      const updatedYaml = injectTerminalShellInitFile(currentYaml, posixInitPath);
+      if (fs.existsSync(configPath)) {
+        const configBak = `${configPath}.bak-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+        try {
+          fs.copyFileSync(configPath, configBak);
+        } catch {}
       }
-
-      if (!options.dryRun) {
-        fs.writeFileSync(configPath, yamlContent, 'utf8');
-      }
+      fs.writeFileSync(configPath, updatedYaml, 'utf8');
     }
   }
 
@@ -346,7 +519,7 @@ if (!options.dryRun) {
   }
   const deployedDirs = fs.readdirSync(options.skillsDir, { withFileTypes: true });
   for (const d of deployedDirs) {
-    if (!d.isDirectory()) continue;
+    if (!d.isDirectory() || !d.name.startsWith('agy-')) continue;
     const mdFiles = [path.join(options.skillsDir, d.name, 'SKILL.md')];
     const refDir = path.join(options.skillsDir, d.name, 'references');
     if (fs.existsSync(refDir)) {
@@ -460,4 +633,20 @@ if (options.runTest && !options.dryRun) {
   log.dim('已跳过连网测试（可通过 --test 选项按需触发）');
 }
 
-console.log('\n\x1b[32m✔ Hermes Agent 适配安装流程已顺利结束！\x1b[0m\n');
+  console.log('\n\x1b[32m✔ Hermes Agent 适配安装流程已顺利结束！\x1b[0m\n');
+}
+
+function isExecutedDirectly() {
+  if (!process.argv[1]) return false;
+  try {
+    const scriptPath = fs.realpathSync(path.resolve(process.argv[1])).toLowerCase();
+    const modulePath = fs.realpathSync(fileURLToPath(import.meta.url)).toLowerCase();
+    return scriptPath === modulePath;
+  } catch {
+    return path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase();
+  }
+}
+
+if (isExecutedDirectly()) {
+  runInstaller();
+}
