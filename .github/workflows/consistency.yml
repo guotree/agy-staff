@@ -19,6 +19,9 @@ jobs:
       - run: npm run check:pi
       - run: npm run check:hermes
       - run: npm run check:opencode
+      - run: npm run check:codex
+      - run: npm run check:claude
+      - run: npm run check:omp
 
   test-ubuntu:
     name: Tests (Ubuntu)

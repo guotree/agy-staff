@@ -15,17 +15,17 @@
 | `implementer` | `implement` | 完成范围明确的编码任务 | `gemini-3.8-flash-high` | 返回后台任务 ID |
 | `lead` | *(任务编排)* | 为当前主 agent 提供任务编排指导，拆解任务并委派给 `staffer`，验收并整合结果 | *(继承)* | 主 agent 负责编排 |
 
-`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`（解耦安装使用 `$agy-lead`），Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`，OpenCode 使用 `/agy-lead`。
+`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`（解耦安装使用 `$agy-lead`），Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`，OpenCode 使用 `/agy-lead`，Oh My Pi 使用 `/skill:agy-lead`。
 
 `staffer` 不预设专业分工或固定的报告格式，但仍遵守共享的操作约定。`reviewer` 会根据对象选择审查方式：代码问题按严重程度列出，并附上 `file:line` 位置；方案和决策审查则检查假设、风险和取舍。`implementer` 可以直接修改工作区，也可以完成任务明确要求的提交、推送或 PR 操作。
 
 执行方式由模式决定，不能通过参数切换。继续一个 `ask` 会话时，答案仍在同一次调用中返回；继续其他模式时，会创建新的后台任务。
 
-Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`（解耦安装使用 `$agy-<persona>`），Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`，OpenCode v2 使用 `/agy-<persona>`。五者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
+Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`（解耦安装使用 `$agy-<persona>`），Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`，OpenCode v2 使用 `/agy-<persona>`，Oh My Pi 使用 `/skill:agy-<persona>`。六者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
 
-Pi 加载的入口位于 `pi-skills/`，Hermes Agent 加载的入口位于 `hermes-skills/`，OpenCode v2 加载的入口位于 `opencode-skills/`，Codex 解耦加载的入口位于 `codex-skills/`，分别由 `npm run generate:pi`、`npm run generate:hermes`、`npm run generate:opencode` 与 `npm run generate:codex` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
+Pi 加载的入口位于 `pi-skills/`，Hermes Agent 加载的入口位于 `hermes-skills/`，OpenCode v2 加载的入口位于 `opencode-skills/`，Codex 解耦加载的入口位于 `codex-skills/`，Oh My Pi 加载的入口位于 `omp-skills/`，分别由 `npm run generate:pi`、`npm run generate:hermes`、`npm run generate:opencode`、`npm run generate:codex` 与 `npm run generate:omp` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
 
-任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi、Hermes、OpenCode 和 Codex 解耦安装中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
+任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi、Hermes、OpenCode、Codex 和 Oh My Pi 解耦安装中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
 
 <a id="双权限档模型"></a>
 
