@@ -17,18 +17,22 @@
     "pi-skills/",
     "hermes-skills/",
     "opencode-skills/",
+    "codex-skills/",
     "companion/",
     "templates/",
     "scripts/generate-pi-skills.mjs",
     "scripts/generate-hermes-skills.mjs",
     "scripts/generate-opencode-skills.mjs",
+    "scripts/generate-codex-skills.mjs",
     "scripts/install-clean-pi.mjs",
     "scripts/install-clean-hermes.mjs",
     "scripts/install-clean-opencode.mjs",
+    "scripts/install-clean-codex.mjs",
     "docs/INSTALL_FOR_AGENTS.md",
     "docs/PI_CLEAN_INSTALL.zh-CN.md",
     "docs/HERMES_CLEAN_INSTALL.zh-CN.md",
     "docs/OPENCODE_CLEAN_INSTALL.zh-CN.md",
+    "docs/CODEX_CLEAN_INSTALL.zh-CN.md",
     "docs/REFERENCE*.md",
     "README.zh-CN.md"
   ],
@@ -39,11 +43,14 @@
     "check:hermes": "node scripts/generate-hermes-skills.mjs --check",
     "generate:opencode": "node scripts/generate-opencode-skills.mjs",
     "check:opencode": "node scripts/generate-opencode-skills.mjs --check",
+    "generate:codex": "node scripts/generate-codex-skills.mjs",
+    "check:codex": "node scripts/generate-codex-skills.mjs --check",
     "test": "node --test tests/*.test.mjs",
     "test:pi": "node --test tests/pi.integration.mjs",
     "test:hermes": "node --test tests/hermes.integration.mjs",
     "test:opencode": "node --test tests/opencode.integration.mjs",
-    "prepack": "npm run check:pi && npm run check:hermes && npm run check:opencode"
+    "test:codex": "node --test tests/codex.integration.mjs",
+    "prepack": "npm run check:pi && npm run check:hermes && npm run check:opencode && npm run check:codex"
   },
   "pi": {
     "skills": [

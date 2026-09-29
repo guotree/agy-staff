@@ -14,7 +14,7 @@
 
 ## 它适合做什么
 
-agy-staff 共提供 7 个技能：5 个核心执行角色（通用任务 `staffer`、调研 `researcher`、审查代码方案与决策 `reviewer`、代码实现 `implementer`、免工具简短问答 `ask`）、任务编排角色 `lead`，以及负责等待、查看进度和收取结果的后台任务管理技能 `jobs`。Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`（亦支持 `/skill agy-staff/agy-<persona>`），OpenCode v2 使用 `/agy-<persona>`（或 `skill` 工具）。
+agy-staff 共提供 7 个技能：5 个核心执行角色（通用任务 `staffer`、调研 `researcher`、审查代码方案与决策 `reviewer`、代码实现 `implementer`、免工具简短问答 `ask`）、任务编排角色 `lead`，以及负责等待、查看进度和收取结果的后台任务管理技能 `jobs`。Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`（解耦安装使用 `$agy-<persona>`），Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`（亦支持 `/skill agy-staff/agy-<persona>`），OpenCode v2 使用 `/agy-<persona>`（或 `skill` 工具）。
 
 为什么需要它：GPT-5.6-Sol 开着 fast mode 也慢；Claude Code 快一些，但 Fable 额度有限，更适合用来编排 subagent，而不是亲自做每一次调研和审查。这些任务可以交给 agy：它几秒钟就能给出第二意见，调研和审查以 Flash 的速度完成，范围明确的实现任务放到后台执行，你继续做手头的事。另外，即使不追求速度，让另一个模型家族审同一份代码，也能发现主力 agent 自己发现不了的问题。
 
@@ -37,27 +37,52 @@ claude plugin marketplace add keli-wen/agy-staff
 claude plugin install agy@agy-staff
 ```
 
-如果使用 Codex，运行：
+如果使用 Codex，提供两种安装方式供你选择：
 
-```bash
-codex plugin marketplace add https://github.com/keli-wen/agy-staff
-codex plugin add agy@agy-staff
-```
+- **方式一：官方插件市场安装（原生 CLI 闭环，支持 Codex 桌面端 UI 呈现）**
+  ```bash
+  codex plugin marketplace add https://github.com/keli-wen/agy-staff
+  codex plugin add agy@agy-staff
+  ```
+  技能以 `$agy:<persona>` 调用（例如 `$agy:ask reply with OK`）。升级时运行 `codex plugin marketplace upgrade` 并重启应用。
 
-如果使用 Pi（Pi Agent），推荐使用**一键解耦安装**（跨平台自适应，彻底解决深层目录嵌套、包冲突与 Windows Git Bash 路径问题）：
+- **方式二：一键解耦安装（推荐多 Agent 用户：共享 `~/.agy-staff` 运行时，无感热更新）**
+  ```bash
+  node ./scripts/install-clean-codex.mjs
+  ```
+  技能安装至个人技能库 `~/.codex/skills/`，以 `$agy-<persona>` 调用（例如 `$agy-ask reply with OK`）。
+  > **常用选项**：
+  > - 演练模式（仅预览不修改文件）：`node ./scripts/install-clean-codex.mjs --dry-run`
+  > - 连网自检（测试 Gemini API 连通性）：`node ./scripts/install-clean-codex.mjs --test`
+  > - 强制更新运行时：`node ./scripts/install-clean-codex.mjs --sync-runtime`
+  > - 自定义运行时目录（支持环境变量 `AGY_STAFF_HOME`）：`--runtime-dir <path>`
+  > - 自定义技能目录（支持环境变量 `CODEX_SKILLS_DIR`）：`--skills-dir <path>`
+  > - 跳过 WSL 链接：`--no-wsl`
+  > 
+  > 更多架构细节与适配说明，详见 [Codex 干净安装与解耦指南](docs/CODEX_CLEAN_INSTALL.zh-CN.md)。
 
-```bash
-node ./scripts/install-clean-pi.mjs
-```
+如果使用 Pi（Pi Agent），同样提供两种安装方式：
 
-> **常用选项**：
-> - 演练模式（仅预览不修改文件）：`node ./scripts/install-clean-pi.mjs --dry-run`
-> - 连网自检（测试 Gemini API 连通性）：`node ./scripts/install-clean-pi.mjs --test`
-> - 强制更新运行时：`node ./scripts/install-clean-pi.mjs --sync-runtime`
-> - 自定义运行时目录（支持环境变量 `AGY_STAFF_HOME`）：`--runtime-dir <path>`
-> - 跳过 WSL 链接：`--no-wsl`
-> 
-> 更多架构细节与手动配置说明，详见 [Pi Agent 干净安装与解耦指南](docs/PI_CLEAN_INSTALL.zh-CN.md)。
+- **方式一：一键解耦安装（推荐：跨平台自适应，彻底解决深层目录嵌套与包冲突）**
+  ```bash
+  node ./scripts/install-clean-pi.mjs
+  ```
+  技能安装至 `~/.pi/agent/skills/`，以 `/skill:agy-<persona>` 调用。升级只需同步更新 `~/.agy-staff` 运行时。
+  > **常用选项**：
+  > - 演练模式（仅预览不修改文件）：`node ./scripts/install-clean-pi.mjs --dry-run`
+  > - 连网自检（测试 Gemini API 连通性）：`node ./scripts/install-clean-pi.mjs --test`
+  > - 强制更新运行时：`node ./scripts/install-clean-pi.mjs --sync-runtime`
+  > - 自定义运行时目录（支持环境变量 `AGY_STAFF_HOME`）：`--runtime-dir <path>`
+  > - 跳过 WSL 链接：`--no-wsl`
+  > 
+  > 更多架构细节与手动配置说明，详见 [Pi Agent 干净安装与解耦指南](docs/PI_CLEAN_INSTALL.zh-CN.md)。
+
+- **方式二：官方 Git Package 方式安装**
+  ```bash
+  pi install git:github.com/keli-wen/agy-staff
+  ```
+  技能同样带 `agy-` 前缀调用（例如 `/skill:agy-ask reply with OK`，任务管理使用 `/skill:agy-jobs`）。
+  更新时运行 `pi update --extension git:github.com/keli-wen/agy-staff`，然后在 Pi 中执行 `/reload`。
 
 对于 **Hermes Agent**（Nous Research 出品），提供遵循 `agentskills.io` 规范的一键解耦安装器（共享 `~/.agy-staff` 运行时，按 `agy-staff` 分类清晰归纳，并自动检测已有运行时）：
 
@@ -90,21 +115,7 @@ node ./scripts/install-clean-opencode.mjs
 > 
 > 更多架构细节与适配说明，详见 [OpenCode 干净安装与解耦指南](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md)。
 
-<details>
-<summary>使用 Pi 官方 Git Package 方式安装</summary>
-
-也可以直接使用 Pi 官方包管理器安装：
-
-```bash
-pi install git:github.com/keli-wen/agy-staff
-```
-
-技能同样带 `agy-` 前缀调用（例如 `/skill:agy-ask reply with OK`，任务管理使用 `/skill:agy-jobs`）。
-更新时运行 `pi update --extension git:github.com/keli-wen/agy-staff`，然后在 Pi 中执行 `/reload`。
-
-</details>
-
-安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`，在 Codex 中输入 `$agy:ask reply with OK`，在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`，在 OpenCode 中输入 `/agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
+安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`，在 Codex 中输入 `$agy:ask reply with OK`（解耦安装输入 `$agy-ask reply with OK`），在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`，在 OpenCode 中输入 `/agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
 
 > [!IMPORTANT]
 > `staffer`、`researcher`、`reviewer` 和 `implementer` 默认使用 `unrestricted` 权限配置，可以读取仓库、运行命令和修改文件。插件会通过提示词说明任务边界和已有改动的归属；任务明确要求提交、推送或创建 PR 时，agy 才应执行相应操作，否则留下工作区改动供你审查。这些提示约定不能替代权限隔离。

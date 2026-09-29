@@ -15,17 +15,17 @@
 | `implementer` | `implement` | 完成范围明确的编码任务 | `gemini-3.8-flash-high` | 返回后台任务 ID |
 | `lead` | *(任务编排)* | 为当前主 agent 提供任务编排指导，拆解任务并委派给 `staffer`，验收并整合结果 | *(继承)* | 主 agent 负责编排 |
 
-`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`，Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`，OpenCode 使用 `/agy-lead`。
+`lead` 为当前主 agent 提供任务编排指导，复用现有 companion 模式，没有自己的运行模式；Claude Code 使用 `/agy:lead`，Codex 使用 `$agy:lead`（解耦安装使用 `$agy-lead`），Pi 使用 `/skill:agy-lead`，Hermes 使用 `/skill agy-lead`，OpenCode 使用 `/agy-lead`。
 
 `staffer` 不预设专业分工或固定的报告格式，但仍遵守共享的操作约定。`reviewer` 会根据对象选择审查方式：代码问题按严重程度列出，并附上 `file:line` 位置；方案和决策审查则检查假设、风险和取舍。`implementer` 可以直接修改工作区，也可以完成任务明确要求的提交、推送或 PR 操作。
 
 执行方式由模式决定，不能通过参数切换。继续一个 `ask` 会话时，答案仍在同一次调用中返回；继续其他模式时，会创建新的后台任务。
 
-Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`，Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`，OpenCode v2 使用 `/agy-<persona>`。五者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
+Claude Code 使用 `/agy:<persona>`，Codex 使用 `$agy:<persona>`（解耦安装使用 `$agy-<persona>`），Pi 使用 `/skill:agy-<persona>`，Hermes Agent 使用 `/skill agy-<persona>`，OpenCode v2 使用 `/agy-<persona>`。五者共用 `companion/` 中的运行逻辑和 `templates/` 中的提示词模板。companion 只依赖 Node.js 标准库。
 
-Pi 加载的入口位于 `pi-skills/`，Hermes Agent 加载的入口位于 `hermes-skills/`，OpenCode v2 加载的入口位于 `opencode-skills/`，分别由 `npm run generate:pi`、`npm run generate:hermes` 和 `npm run generate:opencode` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
+Pi 加载的入口位于 `pi-skills/`，Hermes Agent 加载的入口位于 `hermes-skills/`，OpenCode v2 加载的入口位于 `opencode-skills/`，Codex 解耦加载的入口位于 `codex-skills/`，分别由 `npm run generate:pi`、`npm run generate:hermes`、`npm run generate:opencode` 与 `npm run generate:codex` 根据 `skills/` 自动生成。生成过程会添加 `agy-` 前缀、调整技能之间的相对路径，并附上 `templates/harness-compatibility.md`。这份兼容说明要求主 agent 在工具不可用时寻找等价方法，保留原有要求；无法做到时再向用户求助。
 
-任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi、Hermes 和 OpenCode 中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
+任务管理由 `jobs` 技能和 companion CLI 共同完成，在 Pi、Hermes、OpenCode 和 Codex 解耦安装中对应 `agy-jobs`。通常直接对主 agent 说“agy 的任务进展如何”或“继续刚才的任务”即可，不需要手动记住管理命令。
 
 <a id="双权限档模型"></a>
 
@@ -362,7 +362,11 @@ Claude Code 和 Codex 按版本号缓存插件，例如 `cache/agy-staff/agy/0.4
 
 ### Codex
 
-发布新版本后，运行 `codex plugin marketplace upgrade` 更新插件市场，再按安装流程更新插件并重启应用。必要时也可以移除并重新添加插件市场条目。若仍然出现旧行为，应先确认插件版本和当前会话加载的副本。
+对于采用一键解耦安装的 Codex（`node scripts/install-clean-codex.mjs`），后续升级只需同步更新 `~/.agy-staff` 全局运行时，Codex 本地的技能目录（`~/.codex/skills/agy-*/`）将自动调用最新的伴侣脚本，零侵入无感升级，免除重启应用与版本号锁定问题。
+
+本地开发时，在检出目录运行 `npm run generate:codex` 即可重新生成 Codex 技能入口。
+
+若使用官方插件市场安装，发布新版本后，运行 `codex plugin marketplace upgrade` 更新插件市场，再按安装流程更新插件并重启应用。必要时也可以移除并重新添加插件市场条目。若仍然出现旧行为，应先确认插件版本和当前会话加载的副本。
 
 ### Pi
 
@@ -391,6 +395,8 @@ Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接
 | `AGY_STAFF_HOME` | 共享运行时与技能 | 覆盖全局共享运行时 `companion/` 与 `templates/` 的物理位置 | `~/.agy-staff`（Windows 下为 `%USERPROFILE%\.agy-staff`） |
 | `AGY_BIN` | 伴侣运行时 | 指定 `agy` CLI 二进制路径或测试脚本 | `agy` |
 | `AGY_SETTINGS_FILE` / `ANTIGRAVITY_SETTINGS` | 伴侣运行时 | 指定 Antigravity CLI 权限配置文件的绝对路径 | `~/.gemini/antigravity-cli/settings.json` |
+| `CODEX_HOME` | Codex 安装器 | 覆盖 Codex 配置根目录 | `~/.codex` |
+| `CODEX_SKILLS_DIR` | Codex 安装器 | 覆盖 Codex 技能安装目标父目录 | `~/.codex/skills` |
 | `HERMES_HOME` | Hermes 安装器 | 覆盖 Hermes Agent 数据根目录 | Windows: `%LOCALAPPDATA%\hermes`, Unix: `~/.hermes` |
 | `HERMES_SKILLS_DIR` | Hermes 安装器 | 覆盖 Hermes 技能安装目标父目录 | `<hermes-home>/skills` |
 | `HERMES_SKILLS_CATEGORY` | Hermes 安装器 | 技能在 Hermes 中的分类名称 | `agy-staff` |
@@ -400,7 +406,7 @@ Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接
 
 ## 仓库结构
 
-`skills/` 是角色技能的源文件，`pi-skills/`、`hermes-skills/` 与 `opencode-skills/` 是分别生成的入口。它们共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
+`skills/` 是角色技能的源文件，`pi-skills/`、`hermes-skills/`、`opencode-skills/` 与 `codex-skills/` 是分别生成的入口。它们共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
 
 ```text
 companion/agy-companion.mjs    命令入口、模式选择、任务管理与 setup
@@ -408,10 +414,12 @@ companion/stream-worker.mjs    AGY 流式执行、进程清理与执行时限
 companion/observation.mjs      事件解析、进度快照与输出长度限制
 companion/state-lock.mjs       状态更新与锁回收
 skills/                       角色技能与 jobs 管理技能，以及按需加载的参考文件
+codex-skills/                 自动生成的 Codex 解耦入口与参考文件，不应手动编辑
 pi-skills/                    自动生成的 Pi 入口与参考文件，不应手动编辑
 hermes-skills/                自动生成的 Hermes Agent 标准入口与参考文件，不应手动编辑
 opencode-skills/              自动生成的 OpenCode v2 入口与参考文件，不应手动编辑
 templates/                    共享提示词模板与宿主兼容说明
+scripts/generate-codex-skills.mjs 生成 Codex 技能并检查一致性
 scripts/generate-pi-skills.mjs  生成 Pi 技能并检查一致性
 scripts/generate-hermes-skills.mjs 生成 Hermes 技能并检查一致性
 scripts/generate-opencode-skills.mjs 生成 OpenCode 技能并检查一致性

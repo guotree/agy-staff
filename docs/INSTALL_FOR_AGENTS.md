@@ -49,6 +49,34 @@ Then verify what actually landed: `claude plugin list` should show `agy@agy-staf
 
 ## 2b. Codex — install / upgrade
 
+Codex supports both automated clean decoupled installation and the official plugin marketplace format.
+
+### Recommended: Automated Clean Decoupled Install
+
+Installs the shared runtime into `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) and deploys clean flat skills into Codex's personal skills directory (`~/.codex/skills/`):
+
+```bash
+node scripts/install-clean-codex.mjs
+```
+
+The script automatically:
+1. **Checks Shared Runtime**: Verifies if `~/.agy-staff` runtime (`companion/agy-companion.mjs` syntax and `templates/` integrity) already exists and is healthy. If healthy, it skips runtime copying to avoid unnecessary writes. Use `--sync-runtime` to force update.
+2. **Deploys Flat Skills**: Installs the 7 standard skills (`agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`) under `~/.codex/skills/`.
+3. **Cross-Platform Pathing & Unsandboxed Guidance**: Rewrites invocation commands to use `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/...` and includes sandboxing guidance.
+
+Options for the installer:
+- `--sync-runtime`: Force overwrite/update of shared runtime (alias: `--force-runtime`).
+- `--dry-run`: Preview planned actions without modifying disk.
+- `--test`: Run connectivity smoke test against Gemini after installation.
+- `--runtime-dir <dir>`: Target location for shared runtime (also respects `$AGY_STAFF_HOME`).
+- `--codex-home <dir>`: Target Codex home directory (also respects `$CODEX_HOME`).
+- `--skills-dir <dir>`: Target directory for skills (also respects `$CODEX_SKILLS_DIR`).
+- `--no-wsl`: Skip WSL symlink detection and linking on Windows.
+
+To upgrade a clean decoupled install, updating `~/.agy-staff` is sufficient without reinstalling skills.
+
+### Alternative: Official Plugin Marketplace Install
+
 Install (use the local checkout path instead of the URL if the user gave you one):
 
 ```bash

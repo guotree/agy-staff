@@ -14,7 +14,7 @@ Hire Google's Antigravity CLI (`agy`) as a staffer for **Claude Code**, **OpenAI
 
 ## What & Why
 
-agy-staff lets your senior agents delegate to `agy`, which ships fast Gemini 3.8 Flash. Seven skills in total: five core execution personas (`staffer`, `researcher`, `reviewer`, `implementer`, `ask`), task orchestration guidance (`lead`), and job lifecycle management (`jobs`). Claude Code uses `/agy:<persona>`, Codex uses `$agy:<persona>`, Pi uses `/skill:agy-<persona>`, Hermes Agent uses `/skill agy-<persona>` (or `/skill agy-staff/agy-<persona>`), and OpenCode v2 uses `/agy-<persona>` (or the `skill` tool).
+agy-staff lets your senior agents delegate to `agy`, which ships fast Gemini 3.8 Flash. Seven skills in total: five core execution personas (`staffer`, `researcher`, `reviewer`, `implementer`, `ask`), task orchestration guidance (`lead`), and job lifecycle management (`jobs`). Claude Code uses `/agy:<persona>`, Codex uses `$agy:<persona>` (or `$agy-<persona>` for decoupled installs), Pi uses `/skill:agy-<persona>`, Hermes Agent uses `/skill agy-<persona>` (or `/skill agy-staff/agy-<persona>`), and OpenCode v2 uses `/agy-<persona>` (or the `skill` tool).
 
 If you use Codex you know the feeling: GPT-5.6-Sol is slow even with fast mode on. Claude Code is quicker but still not fast, and Fable quota is scarce enough that you want it orchestrating subagents, not grinding through every survey and review itself. An agy worker gives you a fast lane — second opinions in seconds, research and reviews at Flash speed, scoped implementation handled off to the side while you keep moving. And where speed isn't the point, a second model family looking at the same code buys coverage and robustness your main agent can't give itself.
 
@@ -49,26 +49,53 @@ claude plugin marketplace add keli-wen/agy-staff
 claude plugin install agy@agy-staff
 ```
 
-```bash
-codex plugin marketplace add https://github.com/keli-wen/agy-staff
-codex plugin add agy@agy-staff
-```
+For **Codex (OpenAI Codex CLI)**, two installation options are available:
 
-For **Pi (Pi Agent)**, a clean decoupled installation is recommended (cross-platform, eliminates 9-level directory nesting and package collisions, centralizes the runtime in `~/.agy-staff`, and auto-configures Git Bash on Windows):
+- **Option A: Official Plugin Marketplace Install (Native CLI & UI Integration)**
+  ```bash
+  codex plugin marketplace add https://github.com/keli-wen/agy-staff
+  codex plugin add agy@agy-staff
+  ```
+  Skills are prefixed as `$agy:<persona>` (e.g. `$agy:ask reply with OK`). Update by running `codex plugin marketplace upgrade` and restarting the application.
 
-```bash
-node ./scripts/install-clean-pi.mjs
-```
+- **Option B: Clean Decoupled Install (Recommended for multi-agent setups: shared `~/.agy-staff` runtime, instant updates)**
+  ```bash
+  node ./scripts/install-clean-codex.mjs
+  ```
+  Skills are installed to personal skills `~/.codex/skills/` and prefixed as `$agy-<persona>` (e.g. `$agy-ask reply with OK`).
+  > **Options**:
+  > - Dry run (preview without writing files): `node ./scripts/install-clean-codex.mjs --dry-run`
+  > - Connectivity test with live Gemini API: `node ./scripts/install-clean-codex.mjs --test`
+  > - Force sync/update runtime: `node ./scripts/install-clean-codex.mjs --sync-runtime`
+  > - Custom runtime directory (also respects `AGY_STAFF_HOME`): `--runtime-dir <path>`
+  > - Custom skills directory (also respects `CODEX_SKILLS_DIR`): `--skills-dir <path>`
+  > - Skip WSL link: `--no-wsl`
+  > 
+  > For full architecture details and manual setup steps, see [Codex Clean Install Guide (zh-CN)](docs/CODEX_CLEAN_INSTALL.zh-CN.md).
 
-> **Options**:
-> - Dry run (preview without writing files): `node ./scripts/install-clean-pi.mjs --dry-run`
-> - Connectivity test with live Gemini API: `node ./scripts/install-clean-pi.mjs --test`
-> - Force sync/update runtime: `node ./scripts/install-clean-pi.mjs --sync-runtime`
-> - Custom runtime directory (also respects `AGY_STAFF_HOME`): `--runtime-dir <path>`
-> - Skip WSL link: `--no-wsl`
-> 
-> For full architecture details and manual setup steps, see [Pi Clean Install Guide (zh-CN)](docs/PI_CLEAN_INSTALL.zh-CN.md).
- 
+For **Pi (Pi Agent)**, two installation options are available:
+
+- **Option A: Clean Decoupled Install (Recommended: cross-platform, eliminates 9-level nesting & collisions)**
+  ```bash
+  node ./scripts/install-clean-pi.mjs
+  ```
+  Skills are installed to `~/.pi/agent/skills/` and prefixed as `/skill:agy-<persona>`. Updates only require syncing `~/.agy-staff`.
+  > **Options**:
+  > - Dry run (preview without writing files): `node ./scripts/install-clean-pi.mjs --dry-run`
+  > - Connectivity test with live Gemini API: `node ./scripts/install-clean-pi.mjs --test`
+  > - Force sync/update runtime: `node ./scripts/install-clean-pi.mjs --sync-runtime`
+  > - Custom runtime directory (also respects `AGY_STAFF_HOME`): `--runtime-dir <path>`
+  > - Skip WSL link: `--no-wsl`
+  > 
+  > For full architecture details and manual setup steps, see [Pi Clean Install Guide (zh-CN)](docs/PI_CLEAN_INSTALL.zh-CN.md).
+
+- **Option B: Official Git Package Install**
+  ```bash
+  pi install git:github.com/keli-wen/agy-staff
+  ```
+  Skills are prefixed as `/skill:agy-<persona>` (e.g. `/skill:agy-ask reply with OK`, with `/skill:agy-jobs` for job management).
+  Update with `pi update --extension git:github.com/keli-wen/agy-staff`, then run `/reload`.
+
 For **Hermes Agent** (by Nous Research), a clean decoupled installer adhering to the `agentskills.io` standard is provided (shares the `~/.agy-staff` runtime, cleanly categorized under `agy-staff`, auto-detects existing runtimes):
 
 ```bash
@@ -99,21 +126,7 @@ node ./scripts/install-clean-opencode.mjs
 > 
 > For full architecture details and manual setup steps, see [OpenCode Clean Install Guide (zh-CN)](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md).
 
-<details>
-<summary>Or install via Pi's Git package manager</summary>
-
-You can also install via Pi's standard package manager:
-
-```bash
-pi install git:github.com/keli-wen/agy-staff
-```
-
-Skills are prefixed as `/skill:agy-<persona>` (e.g. `/skill:agy-ask reply with OK`), with `/skill:agy-jobs` for job management.
-Update with `pi update --extension git:github.com/keli-wen/agy-staff`, then run `/reload`.
-
-</details>
-
-Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code), `$agy:ask reply with OK` (Codex), `/skill:agy-ask reply with OK` (Pi), `/skill agy-ask reply with OK` (Hermes), or `/agy-ask reply with OK` (OpenCode). Ask is tool-free and needs no setup.
+Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code), `$agy:ask reply with OK` (Codex, or `$agy-ask reply with OK` for decoupled installs), `/skill:agy-ask reply with OK` (Pi), `/skill agy-ask reply with OK` (Hermes), or `/agy-ask reply with OK` (OpenCode). Ask is tool-free and needs no setup.
 
 > [!IMPORTANT]
 > **There is no mandatory setup step.** `staffer`, `researcher`, `reviewer` and `implementer` run **unrestricted** by default: agy can inspect the repo, run commands, and edit files. agy-staff keeps that practical with prompts that adapt to the current repo state. For example, when `implementer` starts in a dirty workspace, the companion tells agy which files already had changes and reminds it not to overwrite or deliver unrelated user work. If the task asks for a commit, push, or PR, agy can do that delivery; otherwise it leaves a working-tree diff for review. These prompt instructions do not provide permission isolation.
