@@ -30,12 +30,29 @@ agy-staff 共提供 7 个技能：5 个核心执行角色（通用任务 `staffe
 curl -fsSL https://antigravity.google/cli/install.sh | bash
 ```
 
-接着，在你使用的 agent 环境中安装插件。如果使用 Claude Code，运行：
+接着，在你使用的 agent 环境中安装插件。如果使用 Claude Code，提供两种安装方式供你选择：
 
-```bash
-claude plugin marketplace add keli-wen/agy-staff
-claude plugin install agy@agy-staff
-```
+- **方式一：官方插件市场安装（原生 CLI 闭环，支持 `/agy:<persona>` 命令命名空间）**
+  ```bash
+  claude plugin marketplace add keli-wen/agy-staff
+  claude plugin install agy@agy-staff
+  ```
+  技能以 `/agy:<persona>` 调用（例如 `/agy:ask reply with OK`）。升级时运行 `claude plugin update agy@agy-staff` 并重启 Claude Code。
+
+- **方式二：一键解耦安装（推荐多 Agent 用户：共享 `~/.agy-staff` 运行时，无感热更新）**
+  ```bash
+  node ./scripts/install-clean-claude.mjs
+  ```
+  技能安装至个人技能库 `~/.claude/skills/`，以 `/agy-<persona>` 调用（例如 `/agy-ask reply with OK`）。
+  > **常用选项**：
+  > - 演练模式（仅预览不修改文件）：`node ./scripts/install-clean-claude.mjs --dry-run`
+  > - 连网自检（测试 Gemini API 连通性）：`node ./scripts/install-clean-claude.mjs --test`
+  > - 强制更新运行时：`node ./scripts/install-clean-claude.mjs --sync-runtime`
+  > - 自定义运行时目录（支持环境变量 `AGY_STAFF_HOME`）：`--runtime-dir <path>`
+  > - 自定义技能目录（支持环境变量 `CLAUDE_SKILLS_DIR`）：`--skills-dir <path>`
+  > - 跳过 WSL 链接：`--no-wsl`
+  > 
+  > 更多架构细节与适配说明，详见 [Claude Code 干净安装与解耦指南](docs/CLAUDE_CLEAN_INSTALL.zh-CN.md)。
 
 如果使用 Codex，提供两种安装方式供你选择：
 
@@ -115,7 +132,7 @@ node ./scripts/install-clean-opencode.mjs
 > 
 > 更多架构细节与适配说明，详见 [OpenCode 干净安装与解耦指南](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md)。
 
-安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`，在 Codex 中输入 `$agy:ask reply with OK`（解耦安装输入 `$agy-ask reply with OK`），在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`，在 OpenCode 中输入 `/agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
+安装完成后，重启应用（或在 Pi 中执行 `/reload`），再做一次简单的验证：在 Claude Code 中输入 `/agy:ask reply with OK`（解耦安装输入 `/agy-ask reply with OK`），在 Codex 中输入 `$agy:ask reply with OK`（解耦安装输入 `$agy-ask reply with OK`），在 Pi 中输入 `/skill:agy-ask reply with OK`，在 Hermes 中输入 `/skill agy-ask reply with OK`，在 OpenCode 中输入 `/agy-ask reply with OK`。`ask` 不调用工具，也不需要额外的权限配置。
 
 > [!IMPORTANT]
 > `staffer`、`researcher`、`reviewer` 和 `implementer` 默认使用 `unrestricted` 权限配置，可以读取仓库、运行命令和修改文件。插件会通过提示词说明任务边界和已有改动的归属；任务明确要求提交、推送或创建 PR 时，agy 才应执行相应操作，否则留下工作区改动供你审查。这些提示约定不能替代权限隔离。
@@ -134,7 +151,7 @@ install and verify the agy-staff plugin for the harness you are running in. Resp
 
 ## 使用
 
-在 Claude Code 中输入 `/agy:`，就能选择要使用的角色：
+在 Claude Code 中输入 `/agy:`（解耦安装使用 `/agy-`），就能选择要使用的角色：
 
 ![Claude Code 中的 /agy: 命令菜单](assets/claude-code-screenshot.png)
 
@@ -142,7 +159,7 @@ install and verify the agy-staff plugin for the harness you are running in. Resp
 
 ![Codex 中的 $agy 技能选择器](assets/codex-desktop-screenshot.png)
 
-下面的示例使用 Claude Code 的 `/agy:…` 写法。在 Codex 中把它换成 `$agy:…` 即可；Pi 使用 `/skill:agy-…`，Hermes 使用 `/skill agy-…`（亦支持 `/skill agy-staff/agy-…`），OpenCode 使用 `/agy-…`（或 `skill` 工具）。
+下面的示例使用 Claude Code 的 `/agy:…` 写法（解耦安装使用 `/agy-…`）。在 Codex 中把它换成 `$agy:…` 即可（解耦安装使用 `$agy-…`）；Pi 使用 `/skill:agy-…`，Hermes 使用 `/skill agy-…`（亦支持 `/skill agy-staff/agy-…`），OpenCode 使用 `/agy-…`（或 `skill` 工具）。
 
 | 想做的事 | 示例 |
 | --- | --- |
@@ -195,7 +212,7 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff
 
 这两个环境都按版本号管理插件缓存。如果更新后仍然看到旧行为，请先确认是否已重启应用，再参考[升级说明](docs/REFERENCE.zh-CN.md#升级)检查版本和实际安装的提交。
 
-对于 Pi、Hermes 和 OpenCode：如果采用一键解耦安装，日常升级只需同步更新 `~/.agy-staff` 运行时即可，无需重新安装技能；对于 Pi 的 Git Package 安装，运行 `pi update --extension git:github.com/keli-wen/agy-staff` 并在 Pi 中执行 `/reload`。
+对于 Pi、Hermes、OpenCode、Codex 与 Claude Code：如果采用一键解耦安装，日常升级只需同步更新 `~/.agy-staff` 运行时即可，无需重新安装技能；对于 Pi 的 Git Package 安装，运行 `pi update --extension git:github.com/keli-wen/agy-staff` 并在 Pi 中执行 `/reload`。
 
 ## 社区
 
@@ -207,7 +224,7 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff
 
 提交代码前请运行 `npm test`。标准测试使用临时仓库、临时 HOME 和假的 agy，不会调用真实模型或改动你的个人配置。新增回归测试也应保持这一点。需要验证真实 AGY 时，请使用[测试说明](tests/README.md)中单独启用的集成测试。
 
-运行逻辑位于 `companion/`：入口负责模式和任务命令，独立模块负责流式执行、进度快照和状态锁。角色技能位于 `skills/`，共享的提示词模板位于 `templates/`。修改技能时请以 `skills/` 为准，再运行 `npm run generate:pi`、`npm run generate:hermes` 和 `npm run generate:opencode` 分别生成 `pi-skills/`、`hermes-skills/` 与 `opencode-skills/`，用 `npm run check:pi`、`npm run check:hermes` 和 `npm run check:opencode` 检查是否一致。
+运行逻辑位于 `companion/`：入口负责模式和任务命令，独立模块负责流式执行、进度快照和状态锁。角色技能位于 `skills/`，共享的提示词模板位于 `templates/`。修改技能时请以 `skills/` 为准，再运行 `npm run generate:pi`、`npm run generate:hermes`、`npm run generate:opencode`、`npm run generate:codex` 和 `npm run generate:claude` 分别生成 `pi-skills/`、`hermes-skills/`、`opencode-skills/`、`codex-skills/` 与 `claude-skills/`，用 `npm run check:pi`、`npm run check:hermes`、`npm run check:opencode`、`npm run check:codex` 和 `npm run check:claude` 检查是否一致。
 
 README 和参考手册都有中英文版本。修改使用方法或行为说明时，请同步更新对应版本，让两种语言的读者得到一致的信息。
 

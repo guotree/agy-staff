@@ -44,10 +44,29 @@ curl -fsSL https://antigravity.google/cli/install.sh | bash
 
 Step 2 — install the plugin into your harness:
 
-```bash
-claude plugin marketplace add keli-wen/agy-staff
-claude plugin install agy@agy-staff
-```
+For **Claude Code**, two installation options are available:
+
+- **Option A: Official Plugin Marketplace Install (Native CLI Integration)**
+  ```bash
+  claude plugin marketplace add keli-wen/agy-staff
+  claude plugin install agy@agy-staff
+  ```
+  Skills are prefixed as `/agy:<persona>` (e.g. `/agy:ask reply with OK`). Update by running `claude plugin update agy@agy-staff` and restarting Claude Code.
+
+- **Option B: Clean Decoupled Install (Recommended for multi-agent setups: shared `~/.agy-staff` runtime, instant updates)**
+  ```bash
+  node ./scripts/install-clean-claude.mjs
+  ```
+  Skills are installed to personal skills `~/.claude/skills/` and prefixed as `/agy-<persona>` (e.g. `/agy-ask reply with OK`).
+  > **Options**:
+  > - Dry run (preview without writing files): `node ./scripts/install-clean-claude.mjs --dry-run`
+  > - Connectivity test with live Gemini API: `node ./scripts/install-clean-claude.mjs --test`
+  > - Force sync/update runtime: `node ./scripts/install-clean-claude.mjs --sync-runtime`
+  > - Custom runtime directory (also respects `AGY_STAFF_HOME`): `--runtime-dir <path>`
+  > - Custom skills directory (also respects `CLAUDE_SKILLS_DIR`): `--skills-dir <path>`
+  > - Skip WSL link: `--no-wsl`
+  > 
+  > For full architecture details and manual setup steps, see [Claude Code Clean Install Guide (zh-CN)](docs/CLAUDE_CLEAN_INSTALL.zh-CN.md).
 
 For **Codex (OpenAI Codex CLI)**, two installation options are available:
 
@@ -126,7 +145,7 @@ node ./scripts/install-clean-opencode.mjs
 > 
 > For full architecture details and manual setup steps, see [OpenCode Clean Install Guide (zh-CN)](docs/OPENCODE_CLEAN_INSTALL.zh-CN.md).
 
-Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code), `$agy:ask reply with OK` (Codex, or `$agy-ask reply with OK` for decoupled installs), `/skill:agy-ask reply with OK` (Pi), `/skill agy-ask reply with OK` (Hermes), or `/agy-ask reply with OK` (OpenCode). Ask is tool-free and needs no setup.
+Restart the harness afterwards (or run `/reload` in Pi). First run: `/agy:ask reply with OK` (Claude Code, or `/agy-ask reply with OK` for decoupled installs), `$agy:ask reply with OK` (Codex, or `$agy-ask reply with OK` for decoupled installs), `/skill:agy-ask reply with OK` (Pi), `/skill agy-ask reply with OK` (Hermes), or `/agy-ask reply with OK` (OpenCode). Ask is tool-free and needs no setup.
 
 > [!IMPORTANT]
 > **There is no mandatory setup step.** `staffer`, `researcher`, `reviewer` and `implementer` run **unrestricted** by default: agy can inspect the repo, run commands, and edit files. agy-staff keeps that practical with prompts that adapt to the current repo state. For example, when `implementer` starts in a dirty workspace, the companion tells agy which files already had changes and reminds it not to overwrite or deliver unrelated user work. If the task asks for a commit, push, or PR, agy can do that delivery; otherwise it leaves a working-tree diff for review. These prompt instructions do not provide permission isolation.
@@ -156,11 +175,11 @@ codex plugin marketplace upgrade && codex plugin add agy@agy-staff  # then resta
 
 Claude Code and Codex cache per version directory, so an upgrade lands only if the plugin version changed; restart the harness afterwards. If a fix does not show up, see [upgrading](docs/REFERENCE.md#upgrading) — it has the force-refresh command.
 
-For Pi, Hermes, and OpenCode: if using clean decoupled installs, update `~/.agy-staff` (the flat skills in Pi, category skills in Hermes, and OpenCode skills need no reinstall); for Pi with Git package, run `pi update --extension git:github.com/keli-wen/agy-staff` and `/reload`.
+For Pi, Hermes, OpenCode, Codex, and Claude Code: if using clean decoupled installs, update `~/.agy-staff` (the flat skills in Pi, personal skills in Codex and Claude Code, category skills in Hermes, and OpenCode skills need no reinstall); for Pi with Git package, run `pi update --extension git:github.com/keli-wen/agy-staff` and `/reload`.
 
 ### CUJs
 
-Examples below use Claude Code's `/agy:…`; in Codex use `$agy:…`, in Pi use `/skill:agy-…`, in Hermes use `/skill agy-…` (or `/skill agy-staff/agy-…`), and in OpenCode use `/agy-…` (or `skill` tool).
+Examples below use Claude Code's `/agy:…` (or `/agy-…` for decoupled installs); in Codex use `$agy:…` (or `$agy-…`), in Pi use `/skill:agy-…`, in Hermes use `/skill agy-…` (or `/skill agy-staff/agy-…`), and in OpenCode use `/agy-…` (or `skill` tool).
 
 | Use case | Invocation |
 |---|---|
@@ -208,7 +227,7 @@ A few things worth knowing before you open a PR:
 - **Run the tests**: `npm test`. The standard suite uses temporary repos and HOME directories with fake `agy`, plus focused module tests. Keep regression tests offline and independent of personal settings. Real AGY validation is a separate opt-in suite described in [tests/README.md](tests/README.md).
 - **Docs come in pairs**: `README.md` / `README.zh-CN.md` and `docs/REFERENCE.md` / `docs/REFERENCE.zh-CN.md` are kept in sync. Change one, change its counterpart.
 - **Runtime code lives in `companion/`**: the entrypoint handles modes and job commands; separate modules handle streaming execution, observations and state locking. Skills call the companion, and `templates/` holds the shared prompts.
-- **Canonical skills are the source of truth**: edit personas in `skills/`, never in `pi-skills/`, `hermes-skills/`, or `opencode-skills/`. Run `npm run generate:pi`, `npm run generate:hermes`, and `npm run generate:opencode` to generate entrypoints, and `npm run check:pi`, `npm run check:hermes`, and `npm run check:opencode` to verify consistency.
+- **Canonical skills are the source of truth**: edit personas in `skills/`, never in `pi-skills/`, `hermes-skills/`, `opencode-skills/`, `codex-skills/`, or `claude-skills/`. Run `npm run generate:pi`, `npm run generate:hermes`, `npm run generate:opencode`, `npm run generate:codex`, and `npm run generate:claude` to generate entrypoints, and `npm run check:pi`, `npm run check:hermes`, `npm run check:opencode`, `npm run check:codex`, and `npm run check:claude` to verify consistency.
 
 Adding a mode or a flag changes the public surface, so please open an issue first and we can agree on the shape.
 

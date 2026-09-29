@@ -346,7 +346,7 @@ AGY 会读取工作区中的 `AGENTS.md`、`GEMINI.md` 和 `.agents/rules/*.md`�
 
 Windows 为尽力支持，由 CI 的 `Tests (Windows)` 任务覆盖，尚未在真实的 Windows `agy` 安装上验证。子进程均以 `windowsHide: true` 启动，避免后台执行期间弹出控制台窗口。任务取消与进程清理通过 PowerShell（`Get-CimInstance Win32_Process`，`CreationDate` 使用往返精度）发现子孙进程，并逐个终止已确认身份的成员；组长进程使用 `taskkill /PID <pid> /F`，不再使用 `/T`。父子链接只有在子进程创建时间晚于父进程时才被采信：Windows 会在 `ParentProcessId` 中保留已退出父进程的 PID，该 PID 被复用后，一个无关的孤儿进程（通常是另一个任务的后台 worker）否则会被误认为子孙而被杀掉。状态锁针对 Windows 目录与标记文件的重命名和删除瞬态错误（`EPERM`/`EBUSY`/`EACCES`）进行了自动重试。
 
-在 Windows Git Bash 环境下，默认预设的 `alias node="winpty node.exe"` 别名会劫持非交互式命令行调用，在自动化 Agent 管道中引发 `stdin is not a tty` 异常。解耦安装器采用宿主零污染策略优雅隔离：在 Hermes Agent 中，方案 A 通过生成 `<hermes-home>/hermes-terminal-init.sh` 并安全注册到 `config.yaml`（`terminal.shell_init_files`），仅在 Agent 子终端内解除 `node` 别名，完全不污染宿主系统的 `~/.bash_profile` 或 `~/.bashrc`；在 Pi Agent 中，通过 `settings.json` 指派原生 Git Bash 规避别名拦截。在 Windows 下使用 OpenCode v2 且以 PowerShell 为底层 Shell 时，生成的技能提示词特别指明使用 `$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs` 直接调用，规避 `${VAR:-DEFAULT}` 语法报错。所有跨平台技能调用均采用 `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs` 级联展开，杜绝盘符解析错误。
+在 Windows Git Bash 环境下，默认预设的 `alias node="winpty node.exe"` 别名会劫持非交互式命令行调用，在自动化 Agent 管道中引发 `stdin is not a tty` 异常。解耦安装器采用宿主零污染策略优雅隔离：在 Hermes Agent 中，方案 A 通过生成 `<hermes-home>/hermes-terminal-init.sh` 并安全注册到 `config.yaml`（`terminal.shell_init_files`），仅在 Agent 子终端内解除 `node` 别名，完全不污染宿主系统的 `~/.bash_profile` 或 `~/.bashrc`；在 Pi Agent 中，通过 `settings.json` 指派原生 Git Bash 规避别名拦截。在 Windows 下使用 OpenCode v2、Codex 或 Claude Code 且以 PowerShell 为底层 Shell 时，生成的技能提示词特别指明使用 `$env:USERPROFILE\.agy-staff\companion\agy-companion.mjs` 直接调用，规避 `${VAR:-DEFAULT}` 语法报错。所有跨平台技能调用均采用 `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/companion/agy-companion.mjs` 级联展开，杜绝盘符解析错误。
 
 ## 升级
 
@@ -354,7 +354,11 @@ Claude Code 和 Codex 按版本号缓存插件，例如 `cache/agy-staff/agy/0.4
 
 ### Claude Code
 
-先运行 `claude plugin marketplace update agy-staff` 更新插件市场的本地仓库，再运行 `claude plugin update agy@agy-staff` 更新已安装的副本，最后重启 Claude Code。
+对于采用一键解耦安装的 Claude Code（`node scripts/install-clean-claude.mjs`），后续升级只需同步更新 `~/.agy-staff` 全局运行时，Claude Code 本地的个人技能目录（`~/.claude/skills/agy-*/`）将自动调用最新的伴侣脚本，零侵入无感升级，免除版本号锁定问题。
+
+本地开发时，在检出目录运行 `npm run generate:claude` 即可重新生成 Claude Code 技能入口。
+
+若使用官方插件市场安装，先运行 `claude plugin marketplace update agy-staff` 更新插件市场的本地仓库，再运行 `claude plugin update agy@agy-staff` 更新已安装的副本，最后重启 Claude Code。
 
 如果版本号没有变化，`update` 可能仍判断为最新版本，保留旧提交。此时可以运行 `claude plugin uninstall agy@agy-staff && claude plugin install agy@agy-staff` 重新安装，再重启。单独执行 `install` 不会覆盖已经安装的插件。
 
@@ -395,6 +399,8 @@ Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接
 | `AGY_STAFF_HOME` | 共享运行时与技能 | 覆盖全局共享运行时 `companion/` 与 `templates/` 的物理位置 | `~/.agy-staff`（Windows 下为 `%USERPROFILE%\.agy-staff`） |
 | `AGY_BIN` | 伴侣运行时 | 指定 `agy` CLI 二进制路径或测试脚本 | `agy` |
 | `AGY_SETTINGS_FILE` / `ANTIGRAVITY_SETTINGS` | 伴侣运行时 | 指定 Antigravity CLI 权限配置文件的绝对路径 | `~/.gemini/antigravity-cli/settings.json` |
+| `CLAUDE_CONFIG_DIR` / `CLAUDE_HOME` | Claude Code 安装器 | 覆盖 Claude Code 配置根目录 | `~/.claude` |
+| `CLAUDE_SKILLS_DIR` | Claude Code 安装器 | 覆盖 Claude Code 技能安装目标目录 | `~/.claude/skills` |
 | `CODEX_HOME` | Codex 安装器 | 覆盖 Codex 配置根目录 | `~/.codex` |
 | `CODEX_SKILLS_DIR` | Codex 安装器 | 覆盖 Codex 技能安装目标父目录 | `~/.codex/skills` |
 | `HERMES_HOME` | Hermes 安装器 | 覆盖 Hermes Agent 数据根目录 | Windows: `%LOCALAPPDATA%\hermes`, Unix: `~/.hermes` |
@@ -406,7 +412,7 @@ Pi 的 Git 安装跟随所配置的分支或引用，本地路径安装则直接
 
 ## 仓库结构
 
-`skills/` 是角色技能的源文件，`pi-skills/`、`hermes-skills/`、`opencode-skills/` 与 `codex-skills/` 是分别生成的入口。它们共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
+`skills/` 是角色技能的源文件，`pi-skills/`、`hermes-skills/`、`opencode-skills/`、`codex-skills/` 与 `claude-skills/` 是分别生成的入口。它们共用 `templates/` 中的提示词和 `companion/` 中的运行逻辑。
 
 ```text
 companion/agy-companion.mjs    命令入口、模式选择、任务管理与 setup
@@ -414,15 +420,19 @@ companion/stream-worker.mjs    AGY 流式执行、进程清理与执行时限
 companion/observation.mjs      事件解析、进度快照与输出长度限制
 companion/state-lock.mjs       状态更新与锁回收
 skills/                       角色技能与 jobs 管理技能，以及按需加载的参考文件
+claude-skills/                自动生成的 Claude Code 解耦入口与参考文件，不应手动编辑
 codex-skills/                 自动生成的 Codex 解耦入口与参考文件，不应手动编辑
 pi-skills/                    自动生成的 Pi 入口与参考文件，不应手动编辑
 hermes-skills/                自动生成的 Hermes Agent 标准入口与参考文件，不应手动编辑
 opencode-skills/              自动生成的 OpenCode v2 入口与参考文件，不应手动编辑
 templates/                    共享提示词模板与宿主兼容说明
+scripts/generate-claude-skills.mjs 生成 Claude Code 技能并检查一致性
 scripts/generate-codex-skills.mjs 生成 Codex 技能并检查一致性
 scripts/generate-pi-skills.mjs  生成 Pi 技能并检查一致性
 scripts/generate-hermes-skills.mjs 生成 Hermes 技能并检查一致性
 scripts/generate-opencode-skills.mjs 生成 OpenCode 技能并检查一致性
+scripts/install-clean-claude.mjs Claude Code 一键解耦安装与环境适配工具
+scripts/install-clean-codex.mjs Codex 一键解耦安装与环境适配工具
 scripts/install-clean-pi.mjs   Pi Agent 一键解耦安装与环境适配工具
 scripts/install-clean-hermes.mjs Hermes Agent 一键解耦安装与分类适配工具
 scripts/install-clean-opencode.mjs OpenCode v2 一键解耦安装与环境适配工具

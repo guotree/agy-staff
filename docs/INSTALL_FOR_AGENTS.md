@@ -24,6 +24,34 @@ Follow exactly one of the five sections below.
 
 ## 2a. Claude Code — install / upgrade
 
+Claude Code supports both automated clean decoupled installation and the official plugin marketplace format.
+
+### Recommended: Automated Clean Decoupled Install
+
+Installs the shared runtime into `~/.agy-staff` (or `%USERPROFILE%\.agy-staff`) and deploys clean flat skills into Claude Code's personal skills directory (`~/.claude/skills/`):
+
+```bash
+node scripts/install-clean-claude.mjs
+```
+
+The script automatically:
+1. **Checks Shared Runtime**: Verifies if `~/.agy-staff` runtime (`companion/agy-companion.mjs` syntax and `templates/` integrity) already exists and is healthy. If healthy, it skips runtime copying to avoid unnecessary writes. Use `--sync-runtime` to force update.
+2. **Deploys Flat Skills**: Installs the 7 standard skills (`agy-lead`, `agy-ask`, `agy-staffer`, `agy-researcher`, `agy-reviewer`, `agy-implementer`, and `agy-jobs`) under `~/.claude/skills/`.
+3. **Cross-Platform Pathing & Execution Guidance**: Rewrites invocation commands to use `${AGY_STAFF_HOME:-${USERPROFILE:-$HOME}/.agy-staff}/...` and includes Claude Code `Bash` tool and Windows PowerShell guidance.
+
+Options for the installer:
+- `--sync-runtime`: Force overwrite/update of shared runtime (alias: `--force-runtime`).
+- `--dry-run`: Preview planned actions without modifying disk.
+- `--test`: Run connectivity smoke test against Gemini after installation.
+- `--runtime-dir <dir>`: Target location for shared runtime (also respects `$AGY_STAFF_HOME`).
+- `--claude-home <dir>`: Target Claude Code home directory (also respects `$CLAUDE_CONFIG_DIR` or `$CLAUDE_HOME`).
+- `--skills-dir <dir>`: Target directory for skills (also respects `$CLAUDE_SKILLS_DIR`).
+- `--no-wsl`: Skip WSL symlink detection and linking on Windows.
+
+To upgrade a clean decoupled install, updating `~/.agy-staff` is sufficient without reinstalling skills.
+
+### Alternative: Official Plugin Marketplace Install
+
 Use the `claude` CLI. The `/plugin …` forms you may have seen are TUI slash commands typed by a human — you cannot execute them from your Bash tool, and there is no shell equivalent of "typing a slash command".
 
 Install (use the local checkout path instead of the slug if the user gave you one):
